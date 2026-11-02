@@ -1,0 +1,45 @@
+{
+  "name": "hostel-kitchen-os",
+  "version": "0.1.0",
+  "description": "Multi-tenant hostel kitchen operations platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:dev": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "worker": "tsx src/worker.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:26831/nj2216/ukms"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/adapter-mariadb": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "mariadb": "3.5.4",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "prisma": "7.10.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.15.0"
+  }
+}
