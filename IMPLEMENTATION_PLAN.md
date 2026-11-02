@@ -1,5 +1,7 @@
 # Hostel Kitchen OS — Refined Architecture & Implementation Blueprint
 
+> **Implementation status (2026-11-02):** The repository began with this plan and an empty README. This session adds a runnable Next.js/MySQL/Prisma application with first-institution setup, authentication, campus-scoped inventory, stock movements, and audit records. Releases 1 and 2 are partial; Release 5 has an initial deployment baseline; Releases 3, 4, and 6 are not implemented. This is not yet a production-ready completion of the full blueprint.
+
 I’d design Hostel Kitchen OS as a multi-tenant, multi-campus kitchen operations platform that can be deployed both as a cloud service and on a university’s own servers.
 
 Your proposed stack is a good fit, with one important clarification: Next.js can provide the web interface and backend-for-frontend/API routes, but it should not be treated as the database or the entire business architecture by default. For the first version, you can keep the system as a modular Next.js application backed by MySQL, with clearly separated business modules and authorization boundaries.
@@ -633,6 +635,8 @@ Institutions, campuses and access control
 
 Done when: two institutions can share a test deployment, with multiple campuses each, without cross-tenant data access.
 
+**Implementation status: Partial.** First-institution bootstrap, institution/campus records, admin-managed membership and role assignment/revocation, forced change of temporary passwords, revocable hashed sessions, campus-scoped inventory APIs, composite tenant foreign keys, and audit events exist. Isolated MySQL end-to-end flows verified institution and campus isolation. Self-service onboarding for additional institutions, email invitations, role editing, campus assignment changes, comprehensive automated authorization tests, and an institution dashboard remain incomplete; the release acceptance criteria have not been met.
+
 Release 2
 
 Daily operations
@@ -653,6 +657,8 @@ Ingredients, stores, recipes and menus
     
 
 Done when: a kitchen can plan tomorrow's menu, calculate requirements and identify shortages using real stock.
+
+**Implementation status: Partial.** Institution-owned ingredients, campus stores, stock balances and movements, transactional quantity checks, and reorder-level indicators are implemented. Batch/expiry tracking, recipes and version history, meal schedules, demand planning, and shortage/expiry alerts are not implemented.
 
 Release 3
 
@@ -675,6 +681,8 @@ Central and local procurement
 
 Done when: both purchasing models work without double-counting stock or institutional expenditure.
 
+**Implementation status: Not implemented.** Suppliers, purchase requests/orders, approvals, goods receipts, invoices, procurement allocations, and store transfers remain future work.
+
 Release 4
 
 Operational accountability
@@ -696,6 +704,8 @@ Production, waste and cost reports
 
 Done when: the institution can compare campus operations using consistent metric definitions.
 
+**Implementation status: Not implemented.** Production runs, waste reporting, budgets, cost-per-meal metrics, consolidated reporting, exports, and printable reports remain future work.
+
 Release 5
 
 Deployment readiness
@@ -715,6 +725,8 @@ Cloud and self-hosted release
 
 Done when: the same application release can be deployed to a cloud environment and a separate university server.
 
+**Implementation status: Partial.** A reproducible Docker build, Compose MySQL/web deployment, Prisma migration, and liveness/readiness routes exist. Worker deployment, tested restore/rollback procedures, supported upgrade policy, OpenAPI documentation, cloud deployment configuration, and load/security/isolation end-to-end testing remain incomplete.
+
 Release 6
 
 Expansion
@@ -733,6 +745,8 @@ Advanced analytics and integrations
     
 
 Done when: advanced features are useful additions, not dependencies for the core kitchen workflow.
+
+**Implementation status: Not implemented.** Forecasting, supplier comparisons, SSO, accounting/hostel integrations, QR attendance, and offline behavior remain future work.
 
 ## 10. Security and reliability acceptance checklist
 
