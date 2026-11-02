@@ -45,6 +45,9 @@ export async function POST(request: Request) {
     });
     if (!campus) throw new HttpError(404, "Campus not found.");
     const type = body.type === "CENTRAL" ? "CENTRAL" : "CAMPUS";
+    if (type === "CENTRAL" && session.membership.role !== "INSTITUTION_ADMIN") {
+      throw new HttpError(403, "Only institution administrators can create central stores.");
+    }
     const store = await prisma.$transaction(async (tx) => {
       const created = await tx.store.create({
         data: {

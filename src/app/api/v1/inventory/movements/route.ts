@@ -48,7 +48,7 @@ export async function POST(request: Request) {
           : "Quantity must be a positive number with up to 3 decimal places.",
       );
     }
-    const note = body.note === undefined ? null : requiredText(body.note, "Note", 1, 500);
+    const note = body.note === undefined || body.note === "" ? null : requiredText(body.note, "Note", 1, 500);
     const signedMilliUnits =
       quantity.startsWith("-")
         ? -(toMilliUnits(quantity.slice(1)) ?? 0n)

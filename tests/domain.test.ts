@@ -7,6 +7,7 @@ import {
   slugify,
   toMilliUnits,
 } from "../src/lib/domain";
+import { assertSameOrigin, HttpError } from "../src/lib/http";
 import { hashPassword, verifyPassword } from "../src/lib/password";
 
 test("institution slugs are normalized and bounded", () => {
@@ -49,6 +50,25 @@ test("campus-scoped memberships cannot select another campus", () => {
     campusId: "c2",
     forbidden: false,
   });
+});
+
+test("state-changing requests must have the same origin as the host", () => {
+  assert.doesNotThrow(() =>
+    assertSameOrigin(
+      new Request("http://127.0.0.1:3000/api/v1/auth/login", {
+        headers: { host: "127.0.0.1:3000", origin: "http://127.0.0.1:3000" },
+      }),
+    ),
+  );
+  assert.throws(
+    () =>
+      assertSameOrigin(
+        new Request("http://127.0.0.1:3000/api/v1/auth/login", {
+          headers: { host: "127.0.0.1:3000", origin: "https://attacker.example" },
+        }),
+      ),
+    HttpError,
+  );
 });
 
 test("password hashes verify without storing plaintext", async () => {

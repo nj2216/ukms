@@ -27,6 +27,7 @@ export default async function HomePage() {
                 institutionSlug: session.membership.institution.slug,
                 campusName: session.membership.campus?.name ?? null,
                 role: session.membership.role,
+                mustChangePassword: session.user.mustChangePassword,
               }
             : null
         }

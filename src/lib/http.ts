@@ -64,8 +64,23 @@ export async function readJson(request: Request): Promise<Record<string, unknown
 }
 
 export function assertSameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin || origin !== new URL(request.url).origin) {
+  const originHeader = request.headers.get("origin");
+  if (!originHeader) throw new HttpError(403, "Cross-origin requests are not allowed.");
+  const forwardedProtocol = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const protocol = forwardedProtocol ? `${forwardedProtocol}:` : new URL(request.url).protocol;
+  const host = request.headers.get("host") ?? new URL(request.url).host;
+  let origin: URL;
+  let targetOrigin: string;
+  try {
+    origin = new URL(originHeader);
+    targetOrigin = new URL(`${protocol}//${host}`).origin;
+  } catch {
+    throw new HttpError(403, "Cross-origin requests are not allowed.");
+  }
+  if (
+    (protocol !== "http:" && protocol !== "https:") ||
+    origin.origin !== targetOrigin
+  ) {
     throw new HttpError(403, "Cross-origin requests are not allowed.");
   }
 }

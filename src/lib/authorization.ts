@@ -5,6 +5,9 @@ import { HttpError } from "@/lib/http";
 export async function requireMembership(request: Request) {
   const session = await resolveSessionToken(parseCookie(request, SESSION_COOKIE));
   if (!session) throw new HttpError(401, "Authentication is required.");
+  if (session.user.mustChangePassword) {
+    throw new HttpError(403, "Change your temporary password before continuing.");
+  }
   return session;
 }
 

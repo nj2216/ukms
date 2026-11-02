@@ -38,11 +38,12 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const session = await requireMembership(request);
-    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER"]);
+    requireRole(session, ["INSTITUTION_ADMIN"]);
     const body = await readJson(request);
     const name = requiredText(body.name, "Ingredient name");
     const unit = requiredText(body.unit, "Unit", 1, 32);
-    const reorderLevel = body.reorderLevel === undefined ? "0" : String(body.reorderLevel);
+    const reorderLevel =
+      body.reorderLevel === undefined || body.reorderLevel === "" ? "0" : String(body.reorderLevel);
     if (!/^(0|[1-9]\d{0,8})(?:\.\d{1,3})?$/.test(reorderLevel)) {
       throw new HttpError(400, "Reorder level must be a non-negative quantity with up to 3 decimal places.");
     }

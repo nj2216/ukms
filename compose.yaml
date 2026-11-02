@@ -32,7 +32,7 @@ services:
   migrate:
     build:
       context: .
-      target: build
+      target: migrate
     profiles: ["migration"]
     command: ["npm", "run", "db:migrate"]
     environment:

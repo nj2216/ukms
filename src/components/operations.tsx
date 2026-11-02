@@ -9,11 +9,18 @@ type SessionInfo = {
   institutionSlug: string;
   campusName: string | null;
   role: string;
+  mustChangePassword: boolean;
 };
 
 type Campus = { id: string; name: string; code: string };
 type Store = { id: string; name: string; type: string; campus: { id: string; name: string } };
 type Ingredient = { id: string; name: string; unit: string; reorderLevel: string };
+type Membership = {
+  id: string;
+  role: string;
+  campus: Campus | null;
+  user: { id: string; name: string; email: string; active: boolean; mustChangePassword: boolean };
+};
 type Balance = {
   id: string;
   onHand: string;
@@ -66,21 +73,28 @@ export default function Operations({
   const [stores, setStores] = useState<Store[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!session) return;
     try {
-      const [campusResult, storeResult, ingredientResult, inventoryResult] = await Promise.all([
+      const membershipRequest =
+        session.role === "INSTITUTION_ADMIN"
+          ? api<{ memberships: Membership[] }>("/api/v1/memberships")
+          : Promise.resolve({ memberships: [] as Membership[] });
+      const [campusResult, storeResult, ingredientResult, inventoryResult, membershipResult] = await Promise.all([
         api<{ campuses: Campus[] }>("/api/v1/campuses"),
         api<{ stores: Store[] }>("/api/v1/stores"),
         api<{ ingredients: Ingredient[] }>("/api/v1/ingredients"),
         api<{ balances: Balance[] }>("/api/v1/inventory"),
+        membershipRequest,
       ]);
       setCampuses(campusResult.campuses);
       setStores(storeResult.stores);
       setIngredients(ingredientResult.ingredients);
       setBalances(inventoryResult.balances);
+      setMemberships(membershipResult.memberships);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load operations.");
     }
@@ -114,6 +128,42 @@ export default function Operations({
       else window.location.reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The request failed.");
+    }
+  }
+
+  async function addMembership(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    const form = event.currentTarget;
+    const body = Object.fromEntries(new FormData(form).entries());
+    try {
+      const result = await api<{ temporaryPassword: string | null }>("/api/v1/memberships", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      form.reset();
+      setMessage(
+        result.temporaryPassword
+          ? `Account created. Share this temporary password securely; it is shown once: ${result.temporaryPassword}`
+          : "Membership added to the existing account.",
+      );
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not create membership.");
+    }
+  }
+
+  async function revokeMembership(membershipId: string) {
+    setMessage("");
+    try {
+      await api("/api/v1/memberships", {
+        method: "DELETE",
+        body: JSON.stringify({ membershipId }),
+      });
+      setMessage("Membership revoked.");
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not revoke membership.");
     }
   }
 
@@ -156,6 +206,21 @@ export default function Operations({
           </button>
         </form>
         {!initialized && <small>Use a unique password with at least 12 characters.</small>}
+      </section>
+    );
+  }
+
+  if (session.mustChangePassword) {
+    return (
+      <section className="card auth-card">
+        <h2>Change your temporary password</h2>
+        <p>You must choose a new password before accessing institution data.</p>
+        {message && <p className="notice error">{message}</p>}
+        <form className="form-grid" onSubmit={(event) => void submit(event, "/api/v1/auth/change-password", "Password changed.", false)}>
+          <FormField label="Temporary password" name="currentPassword" type="password" />
+          <FormField label="New password" name="newPassword" type="password" min="12" />
+          <button className="primary" type="submit">Update password</button>
+        </form>
       </section>
     );
   }
@@ -207,25 +272,29 @@ export default function Operations({
                   </select>
                 </label>
               )}
-              <label>
-                <span>Store type</span>
-                <select name="type">
-                  <option value="CAMPUS">Campus</option>
-                  <option value="CENTRAL">Central</option>
-                </select>
-              </label>
+              {session.role === "INSTITUTION_ADMIN" && (
+                <label>
+                  <span>Store type</span>
+                  <select name="type">
+                    <option value="CAMPUS">Campus</option>
+                    <option value="CENTRAL">Central</option>
+                  </select>
+                </label>
+              )}
               <button className="primary" type="submit">Add store</button>
             </form>
           </section>
-          <section className="card">
-            <h3>Add ingredient</h3>
-            <form className="form-grid compact" onSubmit={(event) => void submit(event, "/api/v1/ingredients", "Ingredient added.")}>
-              <FormField label="Ingredient name" name="name" />
-              <FormField label="Base unit (kg, L, each)" name="unit" />
-              <FormField label="Reorder level" name="reorderLevel" type="number" min="0" required={false} />
-              <button className="primary" type="submit">Add ingredient</button>
-            </form>
-          </section>
+          {session.role === "INSTITUTION_ADMIN" && (
+            <section className="card">
+              <h3>Add ingredient</h3>
+              <form className="form-grid compact" onSubmit={(event) => void submit(event, "/api/v1/ingredients", "Ingredient added.")}>
+                <FormField label="Ingredient name" name="name" />
+                <FormField label="Base unit (kg, L, each)" name="unit" />
+                <FormField label="Reorder level" name="reorderLevel" type="number" min="0" required={false} />
+                <button className="primary" type="submit">Add ingredient</button>
+              </form>
+            </section>
+          )}
           <section className="card">
             <h3>Record stock movement</h3>
             <form className="form-grid compact" onSubmit={(event) => void submit(event, "/api/v1/inventory/movements", "Stock movement recorded.")}>
@@ -260,6 +329,47 @@ export default function Operations({
             </form>
           </section>
         </div>
+        {session.role === "INSTITUTION_ADMIN" && (
+          <div className="stack">
+            <section className="card">
+              <h3>Team access</h3>
+              <p>New accounts receive a one-time temporary password and must change it at sign-in.</p>
+              <form className="form-grid compact" onSubmit={(event) => void addMembership(event)}>
+                <FormField label="Name" name="name" />
+                <FormField label="Email" name="email" type="email" />
+                <label>
+                  <span>Role</span>
+                  <select name="role">
+                    <option value="CAMPUS_MANAGER">Campus manager</option>
+                    <option value="KITCHEN_STAFF">Kitchen staff</option>
+                    <option value="STOREKEEPER">Storekeeper</option>
+                    <option value="INSTITUTION_ADMIN">Institution administrator</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Campus (required except for institution administrators)</span>
+                  <select name="campusId">
+                    {campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}
+                  </select>
+                </label>
+                <button className="primary" type="submit">Add membership</button>
+              </form>
+            </section>
+            <section className="card">
+              <h3>Current memberships</h3>
+              <div className="member-list">
+                {memberships.map((membership) => (
+                  <div className="member-row" key={membership.id}>
+                    <span><strong>{membership.user.name}</strong><br />{membership.user.email}<br /><small>{membership.role.replaceAll("_", " ")} · {membership.campus?.name ?? "All campuses"}{membership.user.mustChangePassword ? " · password change required" : ""}</small></span>
+                    {membership.user.email !== session.email && (
+                      <button className="secondary" onClick={() => void revokeMembership(membership.id)}>Revoke</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
         <section className="card inventory">
           <div className="section-heading">
             <div>

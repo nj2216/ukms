@@ -635,7 +635,7 @@ Institutions, campuses and access control
 
 Done when: two institutions can share a test deployment, with multiple campuses each, without cross-tenant data access.
 
-**Implementation status: Partial.** First-institution bootstrap, institution/campus records, role-bearing memberships, revocable hashed sessions, tenant-scoped inventory APIs, composite tenant foreign keys, and initial audit events exist. Campus creation is available to the institution administrator. User invitations and membership/role administration, campus-scoped authorization integration tests, cross-tenant end-to-end verification, and the institution dashboard remain incomplete; the release acceptance criteria have not been met.
+**Implementation status: Partial.** First-institution bootstrap, institution/campus records, admin-managed membership and role assignment/revocation, forced change of temporary passwords, revocable hashed sessions, campus-scoped inventory APIs, composite tenant foreign keys, and audit events exist. Isolated MySQL end-to-end flows verified institution and campus isolation. Self-service onboarding for additional institutions, email invitations, role editing, campus assignment changes, comprehensive automated authorization tests, and an institution dashboard remain incomplete; the release acceptance criteria have not been met.
 
 Release 2
 

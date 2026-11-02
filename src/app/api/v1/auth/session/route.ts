@@ -12,6 +12,7 @@ export async function GET(request: Request) {
       institution: session.membership.institution,
       campus: session.membership.campus,
       role: session.membership.role,
+      mustChangePassword: session.user.mustChangePassword,
     });
   } catch (error) {
     return jsonError(error);

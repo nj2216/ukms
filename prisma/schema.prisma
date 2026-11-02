@@ -68,6 +68,7 @@ model User {
   name                String       @db.VarChar(191)
   passwordHash        String       @db.VarChar(255)
   active              Boolean      @default(true)
+  mustChangePassword Boolean      @default(false)
   failedLoginAttempts Int          @default(0)
   lockedUntil         DateTime?
   createdAt           DateTime     @default(now())

@@ -2,7 +2,7 @@
 
 Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, an ingredient catalog, an auditable stock ledger, and current stock/reorder views.
 
-> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Recipes, menus, procurement, production, finance, user invitation/management, worker jobs, and integrations are not implemented. See the roadmap status annotations for the exact release state.
+> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Recipes, menus, procurement, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See the roadmap status annotations for the exact release state.
 
 ## Requirements
 
@@ -90,9 +90,9 @@ Health endpoints are `/api/health/live` and `/api/health/ready`. Readiness check
 - Tenant identity is included in inventory queries and composite foreign keys prevent stock records from referencing another tenant's stores or ingredients.
 - Stock changes are written to an immutable movement ledger and update a maintained balance in the same database transaction. Issues, waste, and negative adjustments cannot make stock negative. Every stock mutation and initial setup creates an audit event.
 - State-changing API calls require same-origin requests. Login failures lock an account for 15 minutes after eight failed attempts.
-- The database should be reachable only from the application. Use HTTPS at the reverse proxy and database TLS (`DATABASE_SSL=true`) for remote MySQL servers.
+- The database should be reachable only from the application. Configure the reverse proxy to preserve the external `Host` and overwrite `X-Forwarded-Proto`; state-changing APIs compare both with the browser `Origin`. Use HTTPS at the reverse proxy and database TLS (`DATABASE_SSL=true`) for remote MySQL servers.
 
-The first-run administrator is currently the only account-creation path. Although the schema defines other membership roles, there is no user invitation or membership administration interface yet. Do not assign operational users by manually editing production database records.
+Institution administrators can assign campus roles and revoke memberships in the team-access panel. Newly created accounts receive a random temporary password shown once; deliver it to the user through a separate secure channel. Users must change it before accessing institution data. Existing accounts can be assigned a second institution membership without changing their password. Email invitations, password recovery, role editing, and self-service institution onboarding are not implemented.
 
 ## Backups
 
@@ -115,9 +115,11 @@ Protect and encrypt backup files according to the institution's data policy. The
 The current versioned routes are:
 
 - `POST /api/v1/auth/bootstrap`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/session`, `GET /api/v1/auth/status`
+- `POST /api/v1/auth/change-password`
 - `GET|POST /api/v1/campuses`
+- `GET|POST|DELETE /api/v1/memberships` (institution administrators only)
 - `GET|POST /api/v1/stores`
 - `GET|POST /api/v1/ingredients`
 - `GET /api/v1/inventory`, `POST /api/v1/inventory/movements`
 
-API pagination is bounded on list endpoints. There is not yet a maintained OpenAPI specification or comprehensive integration/authorization test suite.
+List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. There is not yet a maintained OpenAPI specification or comprehensive automated integration/authorization test suite.

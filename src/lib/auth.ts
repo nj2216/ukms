@@ -1,26 +1,11 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 
 export const SESSION_COOKIE = "ukms_session";
-const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 export function hashSessionToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
-}
-
-export async function createSession(userId: string, membershipId: string) {
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  await prisma.session.create({
-    data: {
-      tokenHash: hashSessionToken(token),
-      userId,
-      membershipId,
-      expiresAt,
-    },
-  });
-  return { token, expiresAt };
 }
 
 export function applySessionCookie(

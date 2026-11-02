@@ -51,6 +51,9 @@ small { color: var(--muted); }
 .compact button { grid-column: 1 / -1; }
 .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .section-heading p { margin: 0; font-size: .88rem; }
+.inventory { min-width: 0; grid-column: 1 / -1; }
+.member-list { display: grid; }
+.member-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--line); padding: 13px 0; }
 .table-scroll { overflow-x: auto; margin-top: 20px; }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: .9rem; }
 th { padding: 10px 12px; color: var(--muted); font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; }
