@@ -45,23 +45,26 @@ export async function POST(request: Request) {
     });
     if (!campus) throw new HttpError(404, "Campus not found.");
     const type = body.type === "CENTRAL" ? "CENTRAL" : "CAMPUS";
-    const store = await prisma.store.create({
-      data: {
-        name,
-        type,
-        campusId: campus.id,
-        institutionId: session.membership.institutionId,
-      },
-      select: { id: true, name: true, type: true, campusId: true },
-    });
-    await prisma.auditEvent.create({
-      data: {
-        institutionId: session.membership.institutionId,
-        actorId: session.userId,
-        action: "store.create",
-        entityType: "store",
-        entityId: store.id,
-      },
+    const store = await prisma.$transaction(async (tx) => {
+      const created = await tx.store.create({
+        data: {
+          name,
+          type,
+          campusId: campus.id,
+          institutionId: session.membership.institutionId,
+        },
+        select: { id: true, name: true, type: true, campusId: true },
+      });
+      await tx.auditEvent.create({
+        data: {
+          institutionId: session.membership.institutionId,
+          actorId: session.userId,
+          action: "store.create",
+          entityType: "store",
+          entityId: created.id,
+        },
+      });
+      return created;
     });
     return NextResponse.json({ store }, { status: 201 });
   } catch (error) {

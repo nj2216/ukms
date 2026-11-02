@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       },
     });
     const user = membership?.user;
-    const validPassword = verifyPassword(password, user?.passwordHash);
+    const validPassword = await verifyPassword(password, user?.passwordHash);
     if (
       !membership ||
       !user ||
@@ -38,15 +38,17 @@ export async function POST(request: Request) {
       !validPassword
     ) {
       if (user && (!user.lockedUntil || user.lockedUntil <= new Date())) {
-        const failures = user.failedLoginAttempts + 1;
-        await prisma.user.update({
+        const updatedUser = await prisma.user.update({
           where: { id: user.id },
-          data: {
-            failedLoginAttempts: failures,
-            lockedUntil:
-              failures >= 8 ? new Date(Date.now() + 15 * 60 * 1000) : null,
-          },
+          data: { failedLoginAttempts: { increment: 1 } },
+          select: { failedLoginAttempts: true },
         });
+        if (updatedUser.failedLoginAttempts >= 8) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { lockedUntil: new Date(Date.now() + 15 * 60 * 1000) },
+          });
+        }
       }
       throw new HttpError(401, "Email, password, or institution is incorrect.");
     }
@@ -61,8 +63,8 @@ export async function POST(request: Request) {
         institutionId: membership.institutionId,
         actorId: user.id,
         action: "auth.login",
-        entityType: "session",
-        entityId: token.slice(0, 8),
+        entityType: "user",
+        entityId: user.id,
       },
     });
     const response = NextResponse.json({

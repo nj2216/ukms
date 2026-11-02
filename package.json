@@ -2,7 +2,6 @@
   "name": "hostel-kitchen-os",
   "version": "0.1.0",
   "description": "Multi-tenant hostel kitchen operations platform",
-  "main": "index.js",
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "dev": "next dev",
@@ -12,13 +11,11 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio",
-    "worker": "tsx src/worker.ts"
+    "db:studio": "prisma studio"
   },
   "repository": {
     "type": "git",
-    "url": "http://localhost:26831/nj2216/ukms"
+    "url": "https://github.com/nj2216/ukms"
   },
   "keywords": [],
   "author": "",

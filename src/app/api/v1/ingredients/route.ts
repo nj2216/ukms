@@ -46,23 +46,26 @@ export async function POST(request: Request) {
     if (!/^(0|[1-9]\d{0,8})(?:\.\d{1,3})?$/.test(reorderLevel)) {
       throw new HttpError(400, "Reorder level must be a non-negative quantity with up to 3 decimal places.");
     }
-    const ingredient = await prisma.ingredient.create({
-      data: {
-        institutionId: session.membership.institutionId,
-        name,
-        unit,
-        reorderLevel,
-      },
-      select: { id: true, name: true, unit: true, reorderLevel: true },
-    });
-    await prisma.auditEvent.create({
-      data: {
-        institutionId: session.membership.institutionId,
-        actorId: session.userId,
-        action: "ingredient.create",
-        entityType: "ingredient",
-        entityId: ingredient.id,
-      },
+    const ingredient = await prisma.$transaction(async (tx) => {
+      const created = await tx.ingredient.create({
+        data: {
+          institutionId: session.membership.institutionId,
+          name,
+          unit,
+          reorderLevel,
+        },
+        select: { id: true, name: true, unit: true, reorderLevel: true },
+      });
+      await tx.auditEvent.create({
+        data: {
+          institutionId: session.membership.institutionId,
+          actorId: session.userId,
+          action: "ingredient.create",
+          entityType: "ingredient",
+          entityId: created.id,
+        },
+      });
+      return created;
     });
     return NextResponse.json({ ingredient }, { status: 201 });
   } catch (error) {

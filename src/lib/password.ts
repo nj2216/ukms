@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 
 const KEY_LENGTH = 64;
 const DUMMY_HASH = `00000000000000000000000000000000:${scryptSync(
@@ -7,15 +7,24 @@ const DUMMY_HASH = `00000000000000000000000000000000:${scryptSync(
   KEY_LENGTH,
 ).toString("hex")}`;
 
-export function hashPassword(password: string): string {
+function deriveKey(password: string, salt: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, KEY_LENGTH, (error, key) => {
+      if (error) reject(error);
+      else resolve(key as Buffer);
+    });
+  });
+}
+
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, KEY_LENGTH).toString("hex");
+  const hash = (await deriveKey(password, salt)).toString("hex");
   return `${salt}:${hash}`;
 }
 
-export function verifyPassword(password: string, storedHash?: string | null): boolean {
+export async function verifyPassword(password: string, storedHash?: string | null): Promise<boolean> {
   const [salt, encodedHash] = (storedHash ?? DUMMY_HASH).split(":");
   const expected = Buffer.from(encodedHash, "hex");
-  const actual = scryptSync(password, salt, KEY_LENGTH);
+  const actual = await deriveKey(password, salt);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }

@@ -70,7 +70,7 @@ export async function currentSession() {
 export function parseCookie(request: Request, name: string) {
   const cookieHeader = request.headers.get("cookie") ?? "";
   const pair = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
-  return pair ? decodeURIComponent(pair.slice(name.length + 1)) : undefined;
+  return pair ? pair.slice(name.length + 1) : undefined;
 }
 
 export async function deleteSession(token?: string) {

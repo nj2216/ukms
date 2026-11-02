@@ -100,8 +100,14 @@ export default function Operations({
     setMessage("");
     const form = event.currentTarget;
     const body = Object.fromEntries(new FormData(form).entries());
+    const bootstrapToken = body.bootstrapToken;
+    delete body.bootstrapToken;
     try {
-      await api(endpoint, { method: "POST", body: JSON.stringify(body) });
+      await api(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body),
+        ...(bootstrapToken ? { headers: { "X-Bootstrap-Token": String(bootstrapToken) } } : {}),
+      });
       form.reset();
       setMessage(successMessage);
       if (reload) setRefreshKey((key) => key + 1);
@@ -138,6 +144,7 @@ export default function Operations({
               <FormField label="First campus name" name="campusName" />
               <FormField label="Campus code" name="campusCode" />
               <FormField label="Your name" name="name" />
+              <FormField label="One-time setup token" name="bootstrapToken" type="password" />
             </>
           ) : (
             <FormField label="Institution slug" name="institutionSlug" />
@@ -237,13 +244,17 @@ export default function Operations({
               <label>
                 <span>Movement</span>
                 <select name="kind">
-                  <option value="RECEIPT">Receipt</option>
+                  {session.role !== "KITCHEN_STAFF" && <option value="RECEIPT">Receipt</option>}
                   <option value="ISSUE">Issue</option>
-                  <option value="WASTE">Waste</option>
-                  <option value="ADJUSTMENT">Adjustment (signed quantity)</option>
+                  {session.role !== "KITCHEN_STAFF" && (
+                    <>
+                      <option value="WASTE">Waste</option>
+                      <option value="ADJUSTMENT">Adjustment (signed quantity)</option>
+                    </>
+                  )}
                 </select>
               </label>
-              <FormField label="Quantity" name="quantity" type="number" min="0.001" />
+              <FormField label="Quantity" name="quantity" type="number" />
               <FormField label="Note" name="note" required={false} />
               <button className="primary" type="submit">Record movement</button>
             </form>

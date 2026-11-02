@@ -2,13 +2,12 @@ import { NextResponse } from "next/server";
 import {
   applySessionCookie,
   hashSessionToken,
-  SESSION_COOKIE,
 } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { normalizeEmail, slugify } from "@/lib/domain";
 import { assertSameOrigin, HttpError, jsonError, readJson, requiredText } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 
 export const runtime = "nodejs";
 
@@ -16,6 +15,20 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const body = await readJson(request);
+    const expectedToken = process.env.BOOTSTRAP_TOKEN;
+    const providedToken = request.headers.get("x-bootstrap-token") ?? "";
+    if (!expectedToken) {
+      throw new HttpError(503, "Configure BOOTSTRAP_TOKEN before initial setup.");
+    }
+    const expectedBytes = Buffer.from(expectedToken);
+    const providedBytes = Buffer.from(providedToken);
+    if (
+      expectedBytes.length < 32 ||
+      expectedBytes.length !== providedBytes.length ||
+      !timingSafeEqual(expectedBytes, providedBytes)
+    ) {
+      throw new HttpError(401, "A valid setup token is required.");
+    }
     const institutionName = requiredText(body.institutionName, "Institution name");
     const campusName = requiredText(body.campusName, "Campus name");
     const campusCode = requiredText(body.campusCode, "Campus code", 1, 64).toUpperCase();
@@ -48,7 +61,7 @@ export async function POST(request: Request) {
         },
       });
       const user = await tx.user.create({
-        data: { email, name, passwordHash: hashPassword(password) },
+        data: { email, name, passwordHash: await hashPassword(password) },
       });
       const membership = await tx.membership.create({
         data: {

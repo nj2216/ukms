@@ -13,6 +13,19 @@ export function jsonError(error: unknown) {
   if (error instanceof HttpError) {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "";
+  if (code === "P2002" || code === "P2003") {
+    return NextResponse.json({ error: "The request conflicts with existing data." }, { status: 409 });
+  }
+  if (code === "P2034") {
+    return NextResponse.json(
+      { error: "The record changed concurrently. Refresh and retry." },
+      { status: 409 },
+    );
+  }
   console.error("Request failed", error);
   return NextResponse.json({ error: "An unexpected error occurred." }, { status: 500 });
 }
@@ -21,10 +34,25 @@ export async function readJson(request: Request): Promise<Record<string, unknown
   if (!request.headers.get("content-type")?.includes("application/json")) {
     throw new HttpError(415, "Content-Type must be application/json.");
   }
-  const length = Number(request.headers.get("content-length") ?? 0);
-  if (length > 16_384) throw new HttpError(413, "Request body is too large.");
+  if (Number(request.headers.get("content-length") ?? 0) > 16_384) {
+    throw new HttpError(413, "Request body is too large.");
+  }
+  const reader = request.body?.getReader();
+  if (!reader) throw new HttpError(400, "Request body must be valid JSON.");
+  const chunks: Uint8Array[] = [];
+  let total = 0;
   try {
-    const body: unknown = await request.json();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > 16_384) {
+        await reader.cancel();
+        throw new HttpError(413, "Request body is too large.");
+      }
+      chunks.push(value);
+    }
+    const body: unknown = JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)));
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       throw new HttpError(400, "A JSON object is required.");
     }
