@@ -1,8 +1,8 @@
 # Hostel Kitchen OS
 
-Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, an ingredient catalog, batch-aware stock movements with expiry tracking, and a role-aware application shell with live inventory alerts.
+Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, batch-aware inventory and expiry tracking, recipe/menu planning, and an initial supplier-to-goods-receipt purchasing workflow.
 
-> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Procurement, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See the roadmap status annotations for the exact release state.
+> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Supplier registration, campus purchase requests, manager approval, purchase orders, and inventory-updating goods receipts have been verified as a manual workflow against temporary MySQL; automated integration and comprehensive authorization tests remain. Quotations, central purchasing/allocations, invoice reconciliation, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for verified scope and remaining work.
 
 ## Requirements
 
@@ -85,7 +85,7 @@ Health endpoints are `/api/health/live` and `/api/health/ready`. Readiness check
 ## Current workflows and security boundaries
 
 - The first-run setup creates one institution, its first campus, the institution administrator, and a main store in a transaction. The bootstrap endpoint requires a configured one-time secret of at least 32 characters and is permanently disabled after setup.
-- Signed-in users land on a protected workspace with role-aware navigation. The available pages cover the live overview, inventory balances, ingredients, stock movements, batch expiry tracking, recipes and versions, campus meal plans, and stock-backed ingredient requirements; institution administrators also have campus and team access pages. Procurement, production, finance, and reporting are not exposed as working modules because their backend workflows are not implemented yet.
+- Signed-in users land on a protected workspace with role-aware navigation. Available pages cover the live overview, inventory balances, ingredients, stock movements, batch expiry tracking, recipes and versions, campus meal plans, purchase requests, approvals, purchase orders, goods receiving, and supplier directory; institution administrators also have campus and team access pages. Procurement is an initial campus workflow; quotations, central allocations, invoice reconciliation, production, finance, and reporting remain incomplete.
 - Passwords use Node.js `scrypt`; sessions use random opaque tokens in `HttpOnly`, `SameSite=Lax` cookies. Only a SHA-256 token hash is stored, and sessions expire after 12 hours.
 - Memberships select an institution and role. Campus-scoped memberships are restricted to their assigned campus; institution administrators have institution-wide access.
 - Tenant identity is included in inventory queries and composite foreign keys prevent stock records from referencing another tenant's stores or ingredients.
@@ -126,6 +126,9 @@ The current versioned routes are:
 - `GET /api/v1/inventory/batches` (scoped expiring/expired batches with a configurable 1–365 day window)
 - `GET|POST /api/v1/recipes`, `POST /api/v1/recipes/:id/versions`
 - `GET|POST /api/v1/menu-plans`, `PATCH /api/v1/menu-plans/:id` (publish), `GET /api/v1/menu-plans/:id/requirements`
+- `GET|POST /api/v1/suppliers`
+- `GET|POST|PATCH /api/v1/purchase-requests` (create/list; submit/approve/reject)
+- `GET /api/v1/purchase-orders`, `POST /api/v1/purchase-orders/:id/receipts`
 - `GET /api/v1/dashboard` (institution/campus-scoped live counts, reorder alerts, and recent activity)
 
 List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. There is not yet a maintained OpenAPI specification or comprehensive automated integration/authorization test suite.

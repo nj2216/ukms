@@ -38,23 +38,40 @@ enum MenuPlanStatus {
   PUBLISHED
 }
 
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum PurchaseOrderStatus {
+  OPEN
+  PARTIALLY_RECEIVED
+  RECEIVED
+}
+
 model Institution {
-  id          String          @id @default(cuid()) @db.VarChar(191)
-  name        String          @db.VarChar(191)
-  slug        String          @unique @db.VarChar(191)
-  timezone    String          @default("UTC") @db.VarChar(64)
-  currency    String          @default("USD") @db.Char(3)
-  createdAt   DateTime        @default(now())
-  campuses    Campus[]
-  memberships Membership[]
-  ingredients Ingredient[]
-  stores      Store[]
-  movements   StockMovement[]
-  balances    StockBalance[]
-  batches     StockBatch[]
-  recipes     Recipe[]
-  menuPlans   MenuPlan[]
-  auditEvents AuditEvent[]
+  id               String            @id @default(cuid()) @db.VarChar(191)
+  name             String            @db.VarChar(191)
+  slug             String            @unique @db.VarChar(191)
+  timezone         String            @default("UTC") @db.VarChar(64)
+  currency         String            @default("USD") @db.Char(3)
+  createdAt        DateTime          @default(now())
+  campuses         Campus[]
+  memberships      Membership[]
+  ingredients      Ingredient[]
+  stores           Store[]
+  movements        StockMovement[]
+  balances         StockBalance[]
+  batches          StockBatch[]
+  recipes          Recipe[]
+  menuPlans        MenuPlan[]
+  suppliers        Supplier[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
+  auditEvents      AuditEvent[]
 }
 
 model BootstrapState {
@@ -63,15 +80,18 @@ model BootstrapState {
 }
 
 model Campus {
-  id            String       @id @default(cuid()) @db.VarChar(191)
-  institutionId String       @db.VarChar(191)
-  name          String       @db.VarChar(191)
-  code          String       @db.VarChar(64)
-  timezone      String       @default("UTC") @db.VarChar(64)
-  institution   Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  memberships   Membership[]
-  stores        Store[]
-  menuPlans     MenuPlan[]
+  id               String            @id @default(cuid()) @db.VarChar(191)
+  institutionId    String            @db.VarChar(191)
+  name             String            @db.VarChar(191)
+  code             String            @db.VarChar(64)
+  timezone         String            @default("UTC") @db.VarChar(64)
+  institution      Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  memberships      Membership[]
+  stores           Store[]
+  menuPlans        MenuPlan[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
 
   @@unique([institutionId, code])
   @@unique([id, institutionId])
@@ -123,18 +143,20 @@ model Session {
 }
 
 model Ingredient {
-  id                String             @id @default(cuid()) @db.VarChar(191)
-  institutionId     String             @db.VarChar(191)
-  name              String             @db.VarChar(191)
-  unit              String             @db.VarChar(32)
-  reorderLevel      Decimal            @default(0) @db.Decimal(12, 3)
-  active            Boolean            @default(true)
-  createdAt         DateTime           @default(now())
-  institution       Institution        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  balances          StockBalance[]
-  movements         StockMovement[]
-  batches           StockBatch[]
-  recipeIngredients RecipeIngredient[]
+  id                   String                @id @default(cuid()) @db.VarChar(191)
+  institutionId        String                @db.VarChar(191)
+  name                 String                @db.VarChar(191)
+  unit                 String                @db.VarChar(32)
+  reorderLevel         Decimal               @default(0) @db.Decimal(12, 3)
+  active               Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  institution          Institution           @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  balances             StockBalance[]
+  movements            StockMovement[]
+  batches              StockBatch[]
+  recipeIngredients    RecipeIngredient[]
+  purchaseRequestItems PurchaseRequestItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
 
   @@unique([institutionId, name])
   @@unique([id, institutionId])
@@ -142,16 +164,19 @@ model Ingredient {
 }
 
 model Store {
-  id            String          @id @default(cuid()) @db.VarChar(191)
-  institutionId String          @db.VarChar(191)
-  campusId      String          @db.VarChar(191)
-  name          String          @db.VarChar(191)
-  type          StoreType       @default(CAMPUS)
-  institution   Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  campus        Campus          @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Cascade)
-  balances      StockBalance[]
-  movements     StockMovement[]
-  batches       StockBatch[]
+  id               String            @id @default(cuid()) @db.VarChar(191)
+  institutionId    String            @db.VarChar(191)
+  campusId         String            @db.VarChar(191)
+  name             String            @db.VarChar(191)
+  type             StoreType         @default(CAMPUS)
+  institution      Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  campus           Campus            @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  balances         StockBalance[]
+  movements        StockMovement[]
+  batches          StockBatch[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseReceipts PurchaseReceipt[]
 
   @@unique([id, institutionId])
   @@unique([campusId, name])
@@ -287,6 +312,132 @@ model MenuPlanItem {
 
   @@unique([menuPlanId, recipeVersionId])
   @@index([institutionId, recipeVersionId])
+}
+
+model Supplier {
+  id               String            @id @default(cuid()) @db.VarChar(191)
+  institutionId    String            @db.VarChar(191)
+  name             String            @db.VarChar(191)
+  email            String?           @db.VarChar(191)
+  phone            String?           @db.VarChar(64)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  institution      Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+
+  @@unique([id, institutionId])
+  @@unique([institutionId, name])
+  @@index([institutionId, active, name])
+}
+
+model PurchaseRequest {
+  id            String                @id @default(cuid()) @db.VarChar(191)
+  institutionId String                @db.VarChar(191)
+  campusId      String                @db.VarChar(191)
+  storeId       String                @db.VarChar(191)
+  supplierId    String                @db.VarChar(191)
+  status        PurchaseRequestStatus @default(DRAFT)
+  note          String?               @db.VarChar(500)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  institution   Institution           @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  campus        Campus                @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  store         Store                 @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  supplier      Supplier              @relation(fields: [supplierId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  items         PurchaseRequestItem[]
+  purchaseOrder PurchaseOrder?
+
+  @@unique([id, institutionId])
+  @@index([institutionId, campusId, status, createdAt])
+}
+
+model PurchaseRequestItem {
+  id                String          @id @default(cuid()) @db.VarChar(191)
+  institutionId     String          @db.VarChar(191)
+  purchaseRequestId String          @db.VarChar(191)
+  ingredientId      String          @db.VarChar(191)
+  quantity          Decimal         @db.Decimal(12, 3)
+  estimatedUnitCost Decimal?        @db.Decimal(12, 4)
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  ingredient        Ingredient      @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Restrict)
+
+  @@unique([purchaseRequestId, ingredientId])
+  @@index([institutionId, ingredientId])
+}
+
+model PurchaseOrder {
+  id                String              @id @default(cuid()) @db.VarChar(191)
+  institutionId     String              @db.VarChar(191)
+  purchaseRequestId String              @db.VarChar(191)
+  campusId          String              @db.VarChar(191)
+  storeId           String              @db.VarChar(191)
+  supplierId        String              @db.VarChar(191)
+  status            PurchaseOrderStatus @default(OPEN)
+  createdAt         DateTime            @default(now())
+  institution       Institution         @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  purchaseRequest   PurchaseRequest     @relation(fields: [purchaseRequestId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  campus            Campus              @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  store             Store               @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  supplier          Supplier            @relation(fields: [supplierId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  items             PurchaseOrderItem[]
+  receipts          PurchaseReceipt[]
+
+  @@unique([id, institutionId])
+  @@unique([purchaseRequestId, institutionId])
+  @@index([institutionId, campusId, status, createdAt])
+}
+
+model PurchaseOrderItem {
+  id               String                @id @default(cuid()) @db.VarChar(191)
+  institutionId    String                @db.VarChar(191)
+  purchaseOrderId  String                @db.VarChar(191)
+  ingredientId     String                @db.VarChar(191)
+  orderedQuantity  Decimal               @db.Decimal(12, 3)
+  receivedQuantity Decimal               @default(0) @db.Decimal(12, 3)
+  unitCost         Decimal?              @db.Decimal(12, 4)
+  purchaseOrder    PurchaseOrder         @relation(fields: [purchaseOrderId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  ingredient       Ingredient            @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  receiptItems     PurchaseReceiptItem[]
+
+  @@unique([id, institutionId])
+  @@unique([purchaseOrderId, ingredientId])
+  @@index([institutionId, ingredientId])
+}
+
+model PurchaseReceipt {
+  id              String                @id @default(cuid()) @db.VarChar(191)
+  institutionId   String                @db.VarChar(191)
+  campusId        String                @db.VarChar(191)
+  storeId         String                @db.VarChar(191)
+  purchaseOrderId String                @db.VarChar(191)
+  idempotencyKey  String?               @db.VarChar(128)
+  receivedAt      DateTime              @default(now())
+  note            String?               @db.VarChar(500)
+  institution     Institution           @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  campus          Campus                @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  store           Store                 @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  purchaseOrder   PurchaseOrder         @relation(fields: [purchaseOrderId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  items           PurchaseReceiptItem[]
+
+  @@unique([id, institutionId])
+  @@unique([institutionId, idempotencyKey])
+  @@index([institutionId, purchaseOrderId, receivedAt])
+}
+
+model PurchaseReceiptItem {
+  id                  String            @id @default(cuid()) @db.VarChar(191)
+  institutionId       String            @db.VarChar(191)
+  purchaseReceiptId   String            @db.VarChar(191)
+  purchaseOrderItemId String            @db.VarChar(191)
+  quantity            Decimal           @db.Decimal(12, 3)
+  batchCode           String?           @db.VarChar(100)
+  expiryDate          DateTime?         @db.Date
+  purchaseReceipt     PurchaseReceipt   @relation(fields: [purchaseReceiptId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId, institutionId], references: [id, institutionId], onDelete: Restrict)
+
+  @@index([institutionId, purchaseReceiptId])
+  @@index([purchaseOrderItemId])
 }
 
 model AuditEvent {

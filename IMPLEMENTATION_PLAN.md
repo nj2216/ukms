@@ -681,7 +681,7 @@ Central and local procurement
 
 Done when: both purchasing models work without double-counting stock or institutional expenditure.
 
-**Implementation status: Not implemented.** Suppliers, purchase requests/orders, approvals, goods receipts, invoices, procurement allocations, and store transfers remain future work.
+**Implementation status: Partial.** The current code adds an institution-scoped supplier directory, campus purchase requests, manager approval/rejection that creates a purchase order, and partial/full goods receipt that updates stock batches, balances, movement history, and audit events transactionally. The migration and primary admin workflow were manually verified against temporary MySQL, including idempotent retry and over-receipt rejection; repeatable integration and tenant/campus authorization tests remain. Quotations, configurable approval rules, central procurement and campus allocations, invoice reconciliation, and inter-store transfers remain unimplemented.
 
 Release 4
 

@@ -34,6 +34,13 @@ const navigation = [
       { href: "/kitchen/recipes", label: "Recipes", icon: "leaf" },
     ],
   },
+  {
+    label: "Procurement",
+    items: [
+      { href: "/procurement", label: "Requests & orders", icon: "activity" },
+      { href: "/procurement/suppliers", label: "Suppliers", icon: "store" },
+    ],
+  },
 ];
 const navigationHrefs = navigation.flatMap((group) => group.items.map((item) => item.href));
 
@@ -57,8 +64,8 @@ const adminNavigation = {
 
 const roadmap = [
   "Production records & waste",
-  "Purchasing & suppliers",
-  "Transfers, budgets & reports",
+  "Central purchasing & allocations",
+  "Invoices, transfers & budgets",
   "Advanced analytics & integrations",
 ];
 
