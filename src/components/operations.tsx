@@ -90,7 +90,7 @@ export default function Operations({
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = useCallback(async () => {
-    if (!session) return;
+    if (!session || session.mustChangePassword) return;
     try {
       const membershipRequest =
         session.role === "INSTITUTION_ADMIN"

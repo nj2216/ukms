@@ -1,11 +1,13 @@
 import { currentSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import Operations from "@/components/operations";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const session = await currentSession();
+  if (session && !session.user.mustChangePassword) redirect("/dashboard");
   const initialized = Boolean(
     await prisma.bootstrapState.findUnique({ where: { key: "complete" } }),
   );

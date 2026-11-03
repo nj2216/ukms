@@ -1,6 +1,6 @@
 # Hostel Kitchen OS
 
-Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, an ingredient catalog, an auditable stock ledger, and current stock/reorder views.
+Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, an ingredient catalog, an auditable stock ledger, stock and movement pages, and a role-aware application shell with live inventory alerts.
 
 > **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Recipes, menus, procurement, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See the roadmap status annotations for the exact release state.
 
@@ -85,6 +85,7 @@ Health endpoints are `/api/health/live` and `/api/health/ready`. Readiness check
 ## Current workflows and security boundaries
 
 - The first-run setup creates one institution, its first campus, the institution administrator, and a main store in a transaction. The bootstrap endpoint requires a configured one-time secret of at least 32 characters and is permanently disabled after setup.
+- Signed-in users land on a protected workspace with role-aware navigation. The available pages cover the live overview, inventory balances, ingredients, stock movements, and stores; institution administrators also have campus and team access pages. Recipe planning, procurement, production, finance, and reporting are not exposed as working modules because their backend workflows are not implemented yet.
 - Passwords use Node.js `scrypt`; sessions use random opaque tokens in `HttpOnly`, `SameSite=Lax` cookies. Only a SHA-256 token hash is stored, and sessions expire after 12 hours.
 - Memberships select an institution and role. Campus-scoped memberships are restricted to their assigned campus; institution administrators have institution-wide access.
 - Tenant identity is included in inventory queries and composite foreign keys prevent stock records from referencing another tenant's stores or ingredients.
@@ -121,5 +122,6 @@ The current versioned routes are:
 - `GET|POST /api/v1/stores`
 - `GET|POST /api/v1/ingredients`
 - `GET /api/v1/inventory`, `GET|POST /api/v1/inventory/movements`
+- `GET /api/v1/dashboard` (institution/campus-scoped live counts, reorder alerts, and recent activity)
 
 List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. There is not yet a maintained OpenAPI specification or comprehensive automated integration/authorization test suite.

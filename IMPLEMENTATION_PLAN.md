@@ -635,7 +635,7 @@ Institutions, campuses and access control
 
 Done when: two institutions can share a test deployment, with multiple campuses each, without cross-tenant data access.
 
-**Implementation status: Partial.** First-institution bootstrap, institution/campus records, admin-managed membership assignment, role/campus editing and revocation, forced change of temporary passwords, revocable hashed sessions, campus-scoped inventory APIs, composite tenant foreign keys, and audit events exist. Membership edits protect the actor from self-lockout and preserve at least one institution administrator. The available automated suite has eight unit tests and does not exercise tenant isolation against a database; the release acceptance criterion is therefore unverified. Additional institution onboarding, email invitations, comprehensive automated authorization tests, and an institution dashboard remain incomplete.
+**Implementation status: Partial.** First-institution bootstrap, institution/campus records, admin-managed membership assignment, role/campus editing and revocation, forced change of temporary passwords, revocable hashed sessions, campus-scoped inventory APIs, composite tenant foreign keys, and audit events exist. Membership edits protect the actor from self-lockout and preserve at least one institution administrator. A protected role-aware app shell, live operations overview, campus/team pages, and institution/campus-scoped dashboard API are now implemented. Browser testing exercised bootstrap, account creation/password change, campus/store setup, assigned-campus store visibility, and denial of direct team-page access for a campus storekeeper. Cross-institution testing, self-service onboarding, email invitations, comprehensive automated authorization tests, and full institution/campus dashboards remain incomplete.
 
 Release 2
 
@@ -658,7 +658,7 @@ Ingredients, stores, recipes and menus
 
 Done when: a kitchen can plan tomorrow's menu, calculate requirements and identify shortages using real stock.
 
-**Implementation status: Partial.** Institution-owned ingredients, campus stores, stock balances and movements, paginated movement history, transactional quantity checks, and reorder-level indicators are implemented in the API and initial UI. Build and unit checks pass, but the stock workflow has not been exercised against a database in this assessment. Batch/expiry tracking, recipes and version history, meal schedules, demand planning, and shortage/expiry alerts are not implemented.
+**Implementation status: Partial.** Institution-owned ingredients, campus stores, stock balances and movements, paginated movement history, transactional quantity checks, ingredient search, and stock/reorder views are implemented in the API and UI. On a temporary MySQL database, browser testing exercised ingredient creation, stock receipt and issue, and the resulting dashboard reorder alert. Batch/expiry tracking, recipes and version history, meal schedules, demand planning, and shortage/expiry actions are not implemented.
 
 Release 3
 
