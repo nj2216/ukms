@@ -87,7 +87,7 @@ export function SuppliersPage({ role }: { role: string }) {
   const [isError, setIsError] = useState(false);
   const [saving, setSaving] = useState(false);
   const suppliers = useResource<{ suppliers: Supplier[] }>("/api/v1/suppliers", refreshKey);
-  const canCreate = role === "INSTITUTION_ADMIN" || role === "CAMPUS_MANAGER";
+  const canCreate = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER"].includes(role);
 
   async function createSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -154,7 +154,7 @@ export function ProcurementPage({
   const [receivingOrderId, setReceivingOrderId] = useState<string | null>(null);
   const receiptKeys = useRef(new Map<string, string>());
   const canRequest = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF"].includes(role);
-  const canApprove = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER"].includes(role);
+  const canApprove = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER"].includes(role);
   const canReceive = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "STOREKEEPER"].includes(role);
 
   const campuses = useResource<{ campuses: Campus[] }>("/api/v1/campuses", 0);

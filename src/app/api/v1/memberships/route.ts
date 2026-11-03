@@ -7,7 +7,15 @@ import { membershipAccessChangeError, normalizeEmail, type MembershipRole } from
 import { assertSameOrigin, HttpError, jsonError, readJson, requiredText } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
 
-const roles: MembershipRole[] = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF", "STOREKEEPER"];
+const roles: MembershipRole[] = [
+  "INSTITUTION_ADMIN",
+  "CAMPUS_MANAGER",
+  "KITCHEN_STAFF",
+  "STOREKEEPER",
+  "PROCUREMENT_OFFICER",
+  "FINANCE_OFFICER",
+  "AUDITOR",
+];
 
 export async function GET(request: Request) {
   try {

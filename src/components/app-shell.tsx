@@ -35,10 +35,31 @@ const navigation = [
     ],
   },
   {
+    label: "Production",
+    items: [
+      { href: "/operations/production", label: "Production records", icon: "activity" },
+      { href: "/operations/waste", label: "Leftovers & waste", icon: "bell" },
+    ],
+  },
+  {
     label: "Procurement",
     items: [
       { href: "/procurement", label: "Requests & orders", icon: "activity" },
       { href: "/procurement/suppliers", label: "Suppliers", icon: "store" },
+      { href: "/procurement/quotes", label: "Quotations", icon: "layers" },
+    ],
+  },
+  {
+    label: "Inventory transfers",
+    items: [
+      { href: "/inventory/transfers", label: "Campus allocations", icon: "store" },
+    ],
+  },
+  {
+    label: "Finance & reporting",
+    items: [
+      { href: "/finance", label: "Budgets & invoices", icon: "activity" },
+      { href: "/reports", label: "Reports & analytics", icon: "grid" },
     ],
   },
 ];
@@ -59,15 +80,9 @@ const adminNavigation = {
   items: [
     { href: "/administration/campuses", label: "Campuses", icon: "building" },
     { href: "/administration/team", label: "Team access", icon: "users" },
+    { href: "/administration/audit-log", label: "Audit log", icon: "activity" },
   ],
 };
-
-const roadmap = [
-  "Production records & waste",
-  "Central purchasing & allocations",
-  "Invoices, transfers & budgets",
-  "Advanced analytics & integrations",
-];
 
 function Icon({ name }: { name: string }) {
   const paths: Record<string, React.ReactNode> = {
@@ -162,10 +177,19 @@ export default function AppShell({
           <span className="tenant-chevron"><Icon name="chevron" /></span>
         </div>
         <nav className="side-nav">
-          {navigation.filter((group) => group.label !== "Kitchen & meal planning" || user.role !== "STOREKEEPER").map((group) => (
+          {navigation
+            .filter((group) => !["Kitchen & meal planning", "Production"].includes(group.label) || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF"].includes(user.role))
+            .filter((group) => group.label !== "Inventory transfers" || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "STOREKEEPER"].includes(user.role))
+            .filter((group) => group.label !== "Procurement" || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF", "STOREKEEPER", "PROCUREMENT_OFFICER"].includes(user.role))
+            .filter((group) => group.label !== "Finance & reporting" || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_OFFICER", "AUDITOR"].includes(user.role))
+            .map((group) => (
             <div className="nav-group" key={group.label}>
               <p className="nav-label">{group.label}</p>
-              {group.items.map((item) => (
+              {group.items
+                .filter((item) => item.href !== "/procurement/quotes" || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER"].includes(user.role))
+                .filter((item) => item.href !== "/finance" || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "FINANCE_OFFICER"].includes(user.role))
+                .filter((item) => item.href !== "/reports" || ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_OFFICER", "AUDITOR"].includes(user.role))
+                .map((item) => (
                 <Link
                   aria-label={item.label}
                   aria-current={isPathActive(pathname, item.href) ? "page" : undefined}
@@ -199,11 +223,6 @@ export default function AppShell({
             </div>
           )}
         </nav>
-        <div className="nav-roadmap">
-          <p className="nav-label">Not live yet</p>
-          {roadmap.map((label) => <span key={label}>{label}</span>)}
-          <small>These workflows are planned and are not available in this release.</small>
-        </div>
         <button className="collapse-button" onClick={() => setSidebarCollapsed((value) => !value)} aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
           <Icon name="chevron" /><span>{sidebarCollapsed ? "Expand menu" : "Collapse menu"}</span>
         </button>

@@ -394,6 +394,9 @@ export default function Operations({
                     <option value="CAMPUS_MANAGER">Campus manager</option>
                     <option value="KITCHEN_STAFF">Kitchen staff</option>
                     <option value="STOREKEEPER">Storekeeper</option>
+                    <option value="PROCUREMENT_OFFICER">Procurement officer</option>
+                    <option value="FINANCE_OFFICER">Finance officer</option>
+                    <option value="AUDITOR">Auditor</option>
                     <option value="INSTITUTION_ADMIN">Institution administrator</option>
                   </select>
                 </label>
@@ -422,6 +425,9 @@ export default function Operations({
                                 <option value="CAMPUS_MANAGER">Campus manager</option>
                                 <option value="KITCHEN_STAFF">Kitchen staff</option>
                                 <option value="STOREKEEPER">Storekeeper</option>
+                                <option value="PROCUREMENT_OFFICER">Procurement officer</option>
+                                <option value="FINANCE_OFFICER">Finance officer</option>
+                                <option value="AUDITOR">Auditor</option>
                                 <option value="INSTITUTION_ADMIN">Institution administrator</option>
                               </select>
                             </label>

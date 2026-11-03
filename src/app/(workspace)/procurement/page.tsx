@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth";
 
 export default async function Page() {
   const session = await currentSession();
-  if (!session) redirect("/");
+  if (!session || !["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF", "STOREKEEPER", "PROCUREMENT_OFFICER"].includes(session.membership.role)) redirect("/dashboard");
   return (
     <ProcurementPage
       role={session.membership.role}

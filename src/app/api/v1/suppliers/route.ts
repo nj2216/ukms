@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 export async function GET(request: Request) {
   try {
     const session = await requireMembership(request);
-    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "STOREKEEPER", "KITCHEN_STAFF"]);
+    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "STOREKEEPER", "KITCHEN_STAFF", "PROCUREMENT_OFFICER"]);
     const search = new URL(request.url).searchParams.get("search")?.trim().slice(0, 100);
     const suppliers = await prisma.supplier.findMany({
       where: {
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
     const session = await requireMembership(request);
-    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER"]);
+    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER"]);
     const body = await readJson(request);
     const name = requiredText(body.name, "Supplier name");
     const email = body.email === undefined || body.email === "" ? null : requiredText(body.email, "Email", 3, 191).toLowerCase();

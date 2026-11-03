@@ -505,7 +505,7 @@ export function TeamPage({ actorEmail }: { actorEmail: string }) {
           <form className="record-form" onSubmit={(event) => void submitMembership(event)}>
             <label>Name<input name="name" required maxLength={191} /></label>
             <label>Email<input name="email" type="email" required maxLength={191} /></label>
-            <label>Role<select name="role" defaultValue="CAMPUS_MANAGER"><option value="CAMPUS_MANAGER">Campus manager</option><option value="KITCHEN_STAFF">Kitchen staff</option><option value="STOREKEEPER">Storekeeper</option><option value="INSTITUTION_ADMIN">Institution administrator</option></select></label>
+            <label>Role<select name="role" defaultValue="CAMPUS_MANAGER"><option value="CAMPUS_MANAGER">Campus manager</option><option value="KITCHEN_STAFF">Kitchen staff</option><option value="STOREKEEPER">Storekeeper</option><option value="PROCUREMENT_OFFICER">Procurement officer</option><option value="FINANCE_OFFICER">Finance officer</option><option value="AUDITOR">Auditor</option><option value="INSTITUTION_ADMIN">Institution administrator</option></select></label>
             <label>Campus (required for campus roles)<select name="campusId" defaultValue=""><option value="">Select a campus</option>{campuses.data?.campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select></label>
             <button className="button-primary" type="submit">Add membership</button>
           </form>
@@ -523,7 +523,7 @@ export function TeamPage({ actorEmail }: { actorEmail: string }) {
                 <button className="button-danger-quiet" onClick={() => void revokeMembership(membership.id)}>Revoke</button>
               </div>}
               {editing === membership.id && <form className="membership-editor" onSubmit={(event) => void submitMembership(event, membership.id)}>
-                <label>Role<select name="role" defaultValue={membership.role}><option value="CAMPUS_MANAGER">Campus manager</option><option value="KITCHEN_STAFF">Kitchen staff</option><option value="STOREKEEPER">Storekeeper</option><option value="INSTITUTION_ADMIN">Institution administrator</option></select></label>
+                <label>Role<select name="role" defaultValue={membership.role}><option value="CAMPUS_MANAGER">Campus manager</option><option value="KITCHEN_STAFF">Kitchen staff</option><option value="STOREKEEPER">Storekeeper</option><option value="PROCUREMENT_OFFICER">Procurement officer</option><option value="FINANCE_OFFICER">Finance officer</option><option value="AUDITOR">Auditor</option><option value="INSTITUTION_ADMIN">Institution administrator</option></select></label>
                 <label>Campus<select name="campusId" defaultValue={membership.campus?.id ?? ""}>{campuses.data?.campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select></label>
                 <button className="button-primary" type="submit">Save access</button>
               </form>}

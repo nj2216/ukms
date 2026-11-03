@@ -42,7 +42,7 @@ type DashboardData = {
   }[];
 };
 
-export default function DashboardPage() {
+export default function DashboardPage({ role }: { role: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
 
@@ -61,9 +61,47 @@ export default function DashboardPage() {
   }, []);
 
   const lowStock = data?.lowStock ?? [];
+  const workflows = role === "INSTITUTION_ADMIN" || role === "CAMPUS_MANAGER"
+    ? [
+        { href: "/kitchen/menus", title: "Plan a meal", detail: "Calculate ingredient needs from a published menu." },
+        { href: "/operations/production", title: "Record production", detail: "Issue ingredients and track servings." },
+        { href: "/procurement", title: "Review procurement", detail: "Move requests through approval and receiving." },
+        { href: "/finance", title: "Manage budgets", detail: "Reconcile invoices and track actual spend." },
+      ]
+    : role === "KITCHEN_STAFF"
+      ? [
+          { href: "/kitchen/menus", title: "Plan a meal", detail: "Calculate stock-backed ingredient requirements." },
+          { href: "/operations/production", title: "Record production", detail: "Issue ingredients and track servings." },
+          { href: "/operations/waste", title: "Record waste", detail: "Account for raw ingredients and leftovers." },
+          { href: "/procurement", title: "Create a purchase request", detail: "Send stock shortages into procurement." },
+        ]
+      : role === "STOREKEEPER"
+        ? [
+            { href: "/inventory/movements", title: "Receive or issue stock", detail: "Update batches and the movement ledger." },
+            { href: "/inventory/expiry", title: "Review expiry alerts", detail: "Prioritize expiring and expired batches." },
+            { href: "/inventory/transfers", title: "Allocate stock", detail: "Complete a scoped store-to-store transfer." },
+            { href: "/operations/waste", title: "Record raw waste", detail: "Deduct ingredient loss from stock." },
+          ]
+        : role === "PROCUREMENT_OFFICER"
+          ? [
+              { href: "/procurement", title: "Review purchase requests", detail: "Approve eligible requests and manage orders." },
+              { href: "/procurement/quotes", title: "Compare quotations", detail: "Award a complete supplier offer to an order." },
+              { href: "/procurement/suppliers", title: "Manage suppliers", detail: "Maintain the institution supplier directory." },
+              { href: "/reports", title: "Review analytics", detail: "Inspect supplier fulfillment and demand signals." },
+            ]
+          : role === "FINANCE_OFFICER"
+            ? [
+                { href: "/finance", title: "Manage budgets and invoices", detail: "Reconcile received orders and monitor spend." },
+                { href: "/reports", title: "Review financial reports", detail: "Compare reconciled spend and campus results." },
+                { href: "/inventory", title: "Review inventory", detail: "Inspect scoped stock balances." },
+              ]
+            : [
+                { href: "/reports", title: "Review reports", detail: "Inspect scoped operational and financial summaries." },
+                { href: "/inventory", title: "Review inventory", detail: "Inspect scoped stock balances." },
+              ];
   return (
     <>
-      <PageHeader eyebrow="Your workspace" title="Overview" description="A live view of your inventory operations and the work that needs attention." />
+      <PageHeader eyebrow="Your workspace" title="Overview" description="Live operational metrics, stock alerts, and next actions for your role." />
       {error && <div className="feedback feedback-error" role="alert">{error}</div>}
       {!data && !error ? <LoadingState label="Loading your operational overview…" /> : data && (
         <>
@@ -91,13 +129,16 @@ export default function DashboardPage() {
               <div className="alert-list">{data.expiryAttention.map((batch) => <div className="alert-row" key={batch.id}><span className="alert-icon">!</span><span><strong>{batch.ingredient.name} · {batch.batchCode}</strong><small>{batch.store.campus.name} · {batch.store.name} · expires {batch.expiryDate.slice(0, 10)}</small></span><StatusBadge tone="warning">{batch.daysUntilExpiry < 0 ? `${Math.abs(batch.daysUntilExpiry)} days expired` : batch.daysUntilExpiry === 0 ? "Expires today" : `${batch.daysUntilExpiry} days left`}</StatusBadge></div>)}</div>
             )}
           </Panel>
-          <Panel title="Available workflows" description="Only supported, connected operations are enabled in this release.">
+          <Panel title="Quick actions" description="Continue the operational workflow from the tasks available to your role.">
             <div className="workflow-next">
-              <Link href="/inventory/ingredients"><span className="workflow-step">01</span><span><strong>Maintain the ingredient catalog</strong><small>Manage ingredient names, units, and reorder levels.</small></span><span>→</span></Link>
-              <Link href="/kitchen/recipes"><span className="workflow-step">02</span><span><strong>Define recipe versions</strong><small>Set ingredient quantities and serving yields.</small></span><span>→</span></Link>
-              <Link href="/kitchen/menus"><span className="workflow-step">03</span><span><strong>Plan a meal</strong><small>Schedule campus meals and calculate stock-backed requirements.</small></span><span>→</span></Link>
+              {workflows.map((workflow, index) => (
+                <Link href={workflow.href} key={workflow.href}>
+                  <span className="workflow-step">{String(index + 1).padStart(2, "0")}</span>
+                  <span><strong>{workflow.title}</strong><small>{workflow.detail}</small></span>
+                  <span>→</span>
+                </Link>
+              ))}
             </div>
-            <p className="dashboard-footnote"><StatusBadge tone="warning">Still in development</StatusBadge> Production recording, waste reporting, procurement, transfers, finance, and advanced reporting remain unavailable. No placeholder records or metrics are shown.</p>
           </Panel>
         </>
       )}

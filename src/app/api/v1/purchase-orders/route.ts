@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 export async function GET(request: Request) {
   try {
     const session = await requireMembership(request);
-    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "STOREKEEPER"]);
+    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "STOREKEEPER", "PROCUREMENT_OFFICER", "FINANCE_OFFICER"]);
     const campusId = scopedCampusId(session, new URL(request.url).searchParams.get("campusId"));
     const orders = await prisma.purchaseOrder.findMany({
       where: {

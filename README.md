@@ -1,8 +1,8 @@
 # Hostel Kitchen OS
 
-Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, batch-aware inventory and expiry tracking, recipe/menu planning, and an initial supplier-to-goods-receipt purchasing workflow.
+Hostel Kitchen OS is a multi-tenant kitchen operations application. It provides first-institution setup, secure sessions, campus-scoped inventory, batch expiry tracking, recipe/menu planning, campus purchasing and receiving, production and waste recording, stock transfers, quotations, invoice reconciliation, budgets, reports, and demand/supplier analytics.
 
-> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Supplier registration, campus purchase requests, manager approval, purchase orders, and inventory-updating goods receipts have been verified as a manual workflow against temporary MySQL; automated integration and comprehensive authorization tests remain. Quotations, central purchasing/allocations, invoice reconciliation, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for verified scope and remaining work.
+> **Implementation status:** this is a working but incomplete product, not the full platform described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). The latest migration and primary production, procurement, finance, and analytics workflows were manually exercised against temporary MySQL. The application has not been deployed to production; external accounting/hostel connectors are not configured. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for verified scope and remaining work.
 
 ## Requirements
 
@@ -85,12 +85,15 @@ Health endpoints are `/api/health/live` and `/api/health/ready`. Readiness check
 ## Current workflows and security boundaries
 
 - The first-run setup creates one institution, its first campus, the institution administrator, and a main store in a transaction. The bootstrap endpoint requires a configured one-time secret of at least 32 characters and is permanently disabled after setup.
-- Signed-in users land on a protected workspace with role-aware navigation. Available pages cover the live overview, inventory balances, ingredients, stock movements, batch expiry tracking, recipes and versions, campus meal plans, purchase requests, approvals, purchase orders, goods receiving, and supplier directory; institution administrators also have campus and team access pages. Procurement is an initial campus workflow; quotations, central allocations, invoice reconciliation, production, finance, and reporting remain incomplete.
+- Signed-in users land on a protected workspace with role-aware navigation for overview, kitchen/meal planning, production/waste, inventory/transfers, procurement/quotations, finance/reports, and administration. Institution administrators also have campus, team-access, and audit-log pages. Campus transfers complete atomically; they do not have an in-transit lifecycle.
 - Passwords use Node.js `scrypt`; sessions use random opaque tokens in `HttpOnly`, `SameSite=Lax` cookies. Only a SHA-256 token hash is stored, and sessions expire after 12 hours.
-- Memberships select an institution and role. Campus-scoped memberships are restricted to their assigned campus; institution administrators have institution-wide access.
+- Memberships select an institution and role: institution administrator, campus manager, kitchen staff, storekeeper, procurement officer, finance officer, or auditor. Campus-scoped memberships are restricted to their assigned campus; institution administrators have institution-wide access.
 - Tenant identity is included in inventory queries and composite foreign keys prevent stock records from referencing another tenant's stores or ingredients.
 - Stock changes are written to an immutable movement ledger and update maintained balance and batch quantities in the same database transaction. Receipts capture optional lot codes and expiry dates; issues consume earliest-expiring, non-expired batches, while waste and negative adjustments can consume expired stock. No movement can make stock negative. Every stock mutation and initial setup creates an audit event. Existing balances are migrated into opening batches without invented expiry dates.
 - Recipes use immutable versions with exact base-unit ingredient quantities and serving yields. Campus meal plans pin a recipe version; demand is rounded up to the nearest 0.001 unit and compared with non-expired stock for that campus. Publishing a plan and calculating shortages do not reserve or issue stock.
+- Production records issue ingredients transactionally and capture a known cost only when all consumed batch costs are known. Waste distinguishes raw stock from prepared servings and records costs when available. Supplier quotations can be compared and awarded into priced orders. Invoice reconciliation is limited to one invoice per fully received purchase order; budget actuals include reconciled invoices only.
+- Reports include production, waste, reconciled spend, inventory valuation, and campus comparisons with CSV export. Demand projections use recent recorded consumption and are intended as transparent planning signals, not an externally validated forecast. Supplier analytics use recorded order and receipt data.
+- Integration boundary: the versioned authenticated REST APIs and CSV export can support future integrations, but there is no maintained OpenAPI specification, registered API-client model, webhook delivery, SSO, or live external connector. Provider selection and credentials are required before accounting or hostel adapters can be enabled.
 - State-changing API calls require same-origin requests. Login failures lock an account for 15 minutes after eight failed attempts.
 - The database should be reachable only from the application. Configure the reverse proxy to preserve the external `Host` and overwrite `X-Forwarded-Proto`; state-changing APIs compare both with the browser `Origin`. Use HTTPS at the reverse proxy and database TLS (`DATABASE_SSL=true`) for remote MySQL servers.
 
@@ -129,6 +132,12 @@ The current versioned routes are:
 - `GET|POST /api/v1/suppliers`
 - `GET|POST|PATCH /api/v1/purchase-requests` (create/list; submit/approve/reject)
 - `GET /api/v1/purchase-orders`, `POST /api/v1/purchase-orders/:id/receipts`
+- `GET|POST|PATCH /api/v1/supplier-quotes` (record, award, or reject quotations)
+- `GET|POST /api/v1/production-runs`, `GET|POST /api/v1/waste`
+- `GET|POST /api/v1/stock-transfers` (atomic transfer completion)
+- `GET|POST|PATCH /api/v1/supplier-invoices`, `GET|POST /api/v1/budgets`
+- `GET /api/v1/reports` (JSON or `?format=csv`), `/api/v1/analytics/forecast`, `/api/v1/analytics/suppliers`
+- `GET /api/v1/audit-events` (institution administrators only)
 - `GET /api/v1/dashboard` (institution/campus-scoped live counts, reorder alerts, and recent activity)
 
-List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. There is not yet a maintained OpenAPI specification or comprehensive automated integration/authorization test suite.
+List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. Automated unit tests exist, but comprehensive repeatable integration and authorization test suites remain outstanding.

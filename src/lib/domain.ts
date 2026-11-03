@@ -3,7 +3,10 @@ export type MembershipRole =
   | "INSTITUTION_ADMIN"
   | "CAMPUS_MANAGER"
   | "KITCHEN_STAFF"
-  | "STOREKEEPER";
+  | "STOREKEEPER"
+  | "PROCUREMENT_OFFICER"
+  | "FINANCE_OFFICER"
+  | "AUDITOR";
 
 export function slugify(value: string): string {
   return value

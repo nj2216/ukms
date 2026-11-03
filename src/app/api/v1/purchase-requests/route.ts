@@ -38,7 +38,7 @@ function parseItems(value: unknown) {
 export async function GET(request: Request) {
   try {
     const session = await requireMembership(request);
-    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF", "STOREKEEPER"]);
+    requireRole(session, ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF", "STOREKEEPER", "PROCUREMENT_OFFICER"]);
     const url = new URL(request.url);
     const campusId = scopedCampusId(session, url.searchParams.get("campusId"));
     const status = url.searchParams.get("status");
@@ -165,7 +165,7 @@ export async function PATCH(request: Request) {
       session,
       action === "submit"
         ? ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF"]
-        : ["INSTITUTION_ADMIN", "CAMPUS_MANAGER"],
+        : ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "PROCUREMENT_OFFICER"],
     );
     const campusId = scopedCampusId(session);
     const updated = await prisma.$transaction(async (tx) => {
