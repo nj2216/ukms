@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  allocateStockBatches,
   campusScope,
+  calculateDemandQuantity,
+  membershipAccessChangeError,
   movementQuantity,
   normalizeEmail,
   slugify,
@@ -38,6 +41,32 @@ test("movement signs match inventory ledger semantics", () => {
   assert.equal(movementQuantity("ADJUSTMENT", "0"), null);
 });
 
+test("stock issues allocate earliest batches first without exceeding their balances", () => {
+  assert.deepEqual(
+    allocateStockBatches(
+      [
+        { id: "earliest", remainingQuantity: "0.75" },
+        { id: "next", remainingQuantity: "1.5" },
+        { id: "later", remainingQuantity: "3" },
+      ],
+      "2.125",
+    ),
+    [
+      { batchId: "earliest", quantity: "0.75" },
+      { batchId: "next", quantity: "1.375" },
+    ],
+  );
+  assert.equal(allocateStockBatches([{ id: "only", remainingQuantity: "1" }], "1.001"), null);
+  assert.equal(allocateStockBatches([{ id: "bad", remainingQuantity: "1.0001" }], "1"), null);
+});
+
+test("recipe demand uses exact milli-units and rounds fractional requirements up", () => {
+  assert.equal(calculateDemandQuantity("0.25", 3, 4), "0.334");
+  assert.equal(calculateDemandQuantity("2", 4, 10), "5");
+  assert.equal(calculateDemandQuantity("0", 3, 4), null);
+  assert.equal(calculateDemandQuantity("1", 0, 4), null);
+});
+
 test("campus-scoped memberships cannot select another campus", () => {
   assert.deepEqual(campusScope({ role: "CAMPUS_MANAGER", campusId: "c1" }), {
     campusId: "c1",
@@ -50,6 +79,25 @@ test("campus-scoped memberships cannot select another campus", () => {
     campusId: "c2",
     forbidden: false,
   });
+});
+
+test("membership changes cannot modify the actor or remove the last administrator", () => {
+  assert.equal(
+    membershipAccessChangeError("u1", "u1", "INSTITUTION_ADMIN", "CAMPUS_MANAGER", 2),
+    "You cannot change your own membership.",
+  );
+  assert.equal(
+    membershipAccessChangeError("u1", "u2", "INSTITUTION_ADMIN", "CAMPUS_MANAGER", 1),
+    "The institution must retain an administrator.",
+  );
+  assert.equal(
+    membershipAccessChangeError("u1", "u2", "INSTITUTION_ADMIN", "CAMPUS_MANAGER", 2),
+    null,
+  );
+  assert.equal(
+    membershipAccessChangeError("u1", "u2", "CAMPUS_MANAGER", "STOREKEEPER", 1),
+    null,
+  );
 });
 
 test("state-changing requests must have the same origin as the host", () => {

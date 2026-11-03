@@ -28,6 +28,15 @@ type Balance = {
   store: Store;
   ingredient: Ingredient;
 };
+type Movement = {
+  id: string;
+  kind: string;
+  quantity: string;
+  note: string | null;
+  createdAt: string;
+  store: { name: string; campus: { name: string } };
+  ingredient: { name: string; unit: string };
+};
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -46,17 +55,19 @@ function FormField({
   type = "text",
   required = true,
   min,
+  autoComplete,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
   min?: string;
+  autoComplete?: string;
 }) {
   return (
     <label>
       <span>{label}</span>
-      <input name={name} type={type} required={required} min={min} />
+      <input name={name} type={type} required={required} min={min} autoComplete={autoComplete} />
     </label>
   );
 }
@@ -73,32 +84,56 @@ export default function Operations({
   const [stores, setStores] = useState<Store[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [movementCursor, setMovementCursor] = useState<string | null>(null);
+  const [loadingMovements, setLoadingMovements] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [editingMembershipId, setEditingMembershipId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = useCallback(async () => {
-    if (!session) return;
+    if (!session || session.mustChangePassword) return;
     try {
       const membershipRequest =
         session.role === "INSTITUTION_ADMIN"
           ? api<{ memberships: Membership[] }>("/api/v1/memberships")
           : Promise.resolve({ memberships: [] as Membership[] });
-      const [campusResult, storeResult, ingredientResult, inventoryResult, membershipResult] = await Promise.all([
+      const [campusResult, storeResult, ingredientResult, inventoryResult, movementResult, membershipResult] = await Promise.all([
         api<{ campuses: Campus[] }>("/api/v1/campuses"),
         api<{ stores: Store[] }>("/api/v1/stores"),
         api<{ ingredients: Ingredient[] }>("/api/v1/ingredients"),
         api<{ balances: Balance[] }>("/api/v1/inventory"),
+        api<{ movements: Movement[]; nextCursor: string | null }>("/api/v1/inventory/movements"),
         membershipRequest,
       ]);
       setCampuses(campusResult.campuses);
       setStores(storeResult.stores);
       setIngredients(ingredientResult.ingredients);
       setBalances(inventoryResult.balances);
+      setMovements(movementResult.movements);
+      setMovementCursor(movementResult.nextCursor);
       setMemberships(membershipResult.memberships);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load operations.");
     }
   }, [session]);
+
+  async function loadOlderMovements() {
+    if (!movementCursor || loadingMovements) return;
+    setLoadingMovements(true);
+    setMessage("");
+    try {
+      const result = await api<{ movements: Movement[]; nextCursor: string | null }>(
+        `/api/v1/inventory/movements?cursor=${encodeURIComponent(movementCursor)}`,
+      );
+      setMovements((current) => [...current, ...result.movements]);
+      setMovementCursor(result.nextCursor);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load movement history.");
+    } finally {
+      setLoadingMovements(false);
+    }
+  }
 
   useEffect(() => {
     void refresh();
@@ -167,6 +202,24 @@ export default function Operations({
     }
   }
 
+  async function updateMembership(event: FormEvent<HTMLFormElement>, membershipId: string) {
+    event.preventDefault();
+    setMessage("");
+    const form = event.currentTarget;
+    const body = Object.fromEntries(new FormData(form).entries());
+    try {
+      await api("/api/v1/memberships", {
+        method: "PATCH",
+        body: JSON.stringify({ ...body, membershipId }),
+      });
+      setEditingMembershipId(null);
+      setMessage("Membership access updated.");
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not update membership.");
+    }
+  }
+
   if (!session) {
     return (
       <section className="card auth-card">
@@ -176,9 +229,9 @@ export default function Operations({
             ? "Use your institution slug and account details."
             : "Create the first institution administrator and main campus."}
         </p>
-        {message && <p className="notice error">{message}</p>}
+        {message && <p className="notice error" role="alert">{message}</p>}
         <form
-          className="form-grid"
+          className={`form-grid auth-form ${initialized ? "auth-login-form" : "auth-setup-form"}`}
           onSubmit={(event) =>
             void submit(
               event,
@@ -194,18 +247,24 @@ export default function Operations({
               <FormField label="First campus name" name="campusName" />
               <FormField label="Campus code" name="campusCode" />
               <FormField label="Your name" name="name" />
-              <FormField label="One-time setup token" name="bootstrapToken" type="password" />
+              <FormField label="One-time setup token" name="bootstrapToken" type="password" autoComplete="off" />
             </>
           ) : (
-            <FormField label="Institution slug" name="institutionSlug" />
+            <FormField label="Institution slug" name="institutionSlug" autoComplete="organization" />
           )}
-          <FormField label="Email" name="email" type="email" />
-          <FormField label="Password" name="password" type="password" min="12" />
+          <FormField label="Email address" name="email" type="email" autoComplete="email" />
+          <FormField
+            label="Password"
+            name="password"
+            type="password"
+            min="12"
+            autoComplete={initialized ? "current-password" : "new-password"}
+          />
           <button className="primary" type="submit">
             {initialized ? "Sign in" : "Create institution"}
           </button>
         </form>
-        {!initialized && <small>Use a unique password with at least 12 characters.</small>}
+        {!initialized && <small className="auth-form-hint">Use a unique password with at least 12 characters.</small>}
       </section>
     );
   }
@@ -215,10 +274,10 @@ export default function Operations({
       <section className="card auth-card">
         <h2>Change your temporary password</h2>
         <p>You must choose a new password before accessing institution data.</p>
-        {message && <p className="notice error">{message}</p>}
-        <form className="form-grid" onSubmit={(event) => void submit(event, "/api/v1/auth/change-password", "Password changed.", false)}>
-          <FormField label="Temporary password" name="currentPassword" type="password" />
-          <FormField label="New password" name="newPassword" type="password" min="12" />
+        {message && <p className="notice error" role="alert">{message}</p>}
+        <form className="form-grid auth-form auth-password-form" onSubmit={(event) => void submit(event, "/api/v1/auth/change-password", "Password changed.", false)}>
+          <FormField label="Temporary password" name="currentPassword" type="password" autoComplete="current-password" />
+          <FormField label="New password" name="newPassword" type="password" min="12" autoComplete="new-password" />
           <button className="primary" type="submit">Update password</button>
         </form>
       </section>
@@ -343,6 +402,9 @@ export default function Operations({
                     <option value="CAMPUS_MANAGER">Campus manager</option>
                     <option value="KITCHEN_STAFF">Kitchen staff</option>
                     <option value="STOREKEEPER">Storekeeper</option>
+                    <option value="PROCUREMENT_OFFICER">Procurement officer</option>
+                    <option value="FINANCE_OFFICER">Finance officer</option>
+                    <option value="AUDITOR">Auditor</option>
                     <option value="INSTITUTION_ADMIN">Institution administrator</option>
                   </select>
                 </label>
@@ -362,7 +424,41 @@ export default function Operations({
                   <div className="member-row" key={membership.id}>
                     <span><strong>{membership.user.name}</strong><br />{membership.user.email}<br /><small>{membership.role.replaceAll("_", " ")} · {membership.campus?.name ?? "All campuses"}{membership.user.mustChangePassword ? " · password change required" : ""}</small></span>
                     {membership.user.email !== session.email && (
-                      <button className="secondary" onClick={() => void revokeMembership(membership.id)}>Revoke</button>
+                      <div className="member-actions">
+                        {editingMembershipId === membership.id ? (
+                          <form className="member-editor" onSubmit={(event) => void updateMembership(event, membership.id)}>
+                            <label>
+                              <span>Role</span>
+                              <select name="role" defaultValue={membership.role}>
+                                <option value="CAMPUS_MANAGER">Campus manager</option>
+                                <option value="KITCHEN_STAFF">Kitchen staff</option>
+                                <option value="STOREKEEPER">Storekeeper</option>
+                                <option value="PROCUREMENT_OFFICER">Procurement officer</option>
+                                <option value="FINANCE_OFFICER">Finance officer</option>
+                                <option value="AUDITOR">Auditor</option>
+                                <option value="INSTITUTION_ADMIN">Institution administrator</option>
+                              </select>
+                            </label>
+                            <label>
+                              <span>Campus</span>
+                              <select
+                                name="campusId"
+                                defaultValue={membership.campus?.id ?? campuses[0]?.id ?? ""}
+                                required
+                              >
+                                {campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}
+                              </select>
+                            </label>
+                            <button className="primary" type="submit">Save access</button>
+                            <button className="secondary" type="button" onClick={() => setEditingMembershipId(null)}>Cancel</button>
+                          </form>
+                        ) : (
+                          <>
+                            <button className="secondary" onClick={() => setEditingMembershipId(membership.id)}>Edit access</button>
+                            <button className="secondary" onClick={() => void revokeMembership(membership.id)}>Revoke</button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -397,6 +493,43 @@ export default function Operations({
                 </tbody>
               </table>
             </div>
+          )}
+        </section>
+        <section className="card inventory">
+          <div className="section-heading">
+            <div>
+              <h3>Stock movement history</h3>
+              <p>Recent receipts, issues, waste, and adjustments from your authorized campuses.</p>
+            </div>
+            <button className="secondary" onClick={() => setRefreshKey((key) => key + 1)}>Refresh history</button>
+          </div>
+          {movements.length === 0 ? (
+            <p className="empty">No stock movements have been recorded yet.</p>
+          ) : (
+            <>
+              <div className="table-scroll">
+                <table>
+                  <thead><tr><th>Date</th><th>Movement</th><th>Ingredient</th><th>Store</th><th>Quantity</th><th>Note</th></tr></thead>
+                  <tbody>
+                    {movements.map((movement) => (
+                      <tr key={movement.id}>
+                        <td>{new Date(movement.createdAt).toLocaleString()}</td>
+                        <td><span className="tag">{movement.kind.replaceAll("_", " ")}</span></td>
+                        <td>{movement.ingredient.name}</td>
+                        <td>{movement.store.campus.name} · {movement.store.name}</td>
+                        <td>{movement.quantity} {movement.ingredient.unit}</td>
+                        <td>{movement.note || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {movementCursor && (
+                <button className="secondary" onClick={() => void loadOlderMovements()} disabled={loadingMovements}>
+                  {loadingMovements ? "Loading…" : "Load older movements"}
+                </button>
+              )}
+            </>
           )}
         </section>
       </div>

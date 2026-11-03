@@ -3,11 +3,19 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { requireMembership, requireRole } from "@/lib/authorization";
 import { prisma } from "@/lib/db";
-import { normalizeEmail } from "@/lib/domain";
+import { membershipAccessChangeError, normalizeEmail, type MembershipRole } from "@/lib/domain";
 import { assertSameOrigin, HttpError, jsonError, readJson, requiredText } from "@/lib/http";
 import { hashPassword } from "@/lib/password";
 
-const roles = ["INSTITUTION_ADMIN", "CAMPUS_MANAGER", "KITCHEN_STAFF", "STOREKEEPER"] as const;
+const roles: MembershipRole[] = [
+  "INSTITUTION_ADMIN",
+  "CAMPUS_MANAGER",
+  "KITCHEN_STAFF",
+  "STOREKEEPER",
+  "PROCUREMENT_OFFICER",
+  "FINANCE_OFFICER",
+  "AUDITOR",
+];
 
 export async function GET(request: Request) {
   try {
@@ -106,6 +114,84 @@ export async function POST(request: Request) {
       };
     });
     return NextResponse.json(created, { status: 201 });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    assertSameOrigin(request);
+    const session = await requireMembership(request);
+    requireRole(session, ["INSTITUTION_ADMIN"]);
+    const body = await readJson(request);
+    const membershipId = requiredText(body.membershipId, "Membership");
+    if (typeof body.role !== "string" || !roles.includes(body.role as MembershipRole)) {
+      throw new HttpError(400, "Choose a valid role.");
+    }
+    const role = body.role as MembershipRole;
+    const campusId =
+      role === "INSTITUTION_ADMIN" ? null : requiredText(body.campusId, "Campus");
+
+    const membership = await prisma.$transaction(async (tx) => {
+      const target = await tx.membership.findFirst({
+        where: {
+          id: membershipId,
+          institutionId: session.membership.institutionId,
+        },
+        select: { id: true, userId: true, role: true },
+      });
+      if (!target) throw new HttpError(404, "Membership not found.");
+
+      const adminCount =
+        target.role === "INSTITUTION_ADMIN" && role !== "INSTITUTION_ADMIN"
+          ? await tx.membership.count({
+              where: {
+                institutionId: session.membership.institutionId,
+                role: "INSTITUTION_ADMIN",
+              },
+            })
+          : 0;
+      const accessError = membershipAccessChangeError(
+        session.userId,
+        target.userId,
+        target.role,
+        role,
+        adminCount,
+      );
+      if (accessError) throw new HttpError(409, accessError);
+
+      if (campusId) {
+        const campus = await tx.campus.findFirst({
+          where: {
+            id: campusId,
+            institutionId: session.membership.institutionId,
+          },
+          select: { id: true },
+        });
+        if (!campus) throw new HttpError(404, "Campus not found.");
+      }
+
+      const updated = await tx.membership.update({
+        where: { id: target.id },
+        data: { role, campusId },
+        include: {
+          user: { select: { id: true, name: true, email: true, active: true, mustChangePassword: true } },
+          campus: { select: { id: true, name: true, code: true } },
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          institutionId: session.membership.institutionId,
+          actorId: session.userId,
+          action: "membership.update",
+          entityType: "membership",
+          entityId: updated.id,
+        },
+      });
+      return updated;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    return NextResponse.json({ membership });
   } catch (error) {
     return jsonError(error);
   }

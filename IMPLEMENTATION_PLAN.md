@@ -1,6 +1,6 @@
 # Hostel Kitchen OS — Refined Architecture & Implementation Blueprint
 
-> **Implementation status (2026-11-02):** The repository began with this plan and an empty README. This session adds a runnable Next.js/MySQL/Prisma application with first-institution setup, authentication, campus-scoped inventory, stock movements, and audit records. Releases 1 and 2 are partial; Release 5 has an initial deployment baseline; Releases 3, 4, and 6 are not implemented. This is not yet a production-ready completion of the full blueprint.
+> **Implementation status (assessed 2026-11-03):** All six releases have partial implementation. In addition to the original foundation, inventory, recipes, and campus purchasing, the repository now includes production and waste records, quotations, purchase order award, transfers, invoice reconciliation, budgets, reports/CSV, demand forecasts, supplier analytics, and role-aware workspace pages. The bootstrap, sign-in, and forced-password-change screens have a responsive branded layout. Fresh MySQL migrations and primary end-to-end API workflows were exercised manually; authenticated application screenshots and a synthetic-data workflow guide are in [`documentation/WORKFLOWS.md`](documentation/WORKFLOWS.md). Automated cross-tenant authorization coverage, full release acceptance, deployment/restore procedures, cost-per-meal reporting, and external connectors remain incomplete. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for evidence and limitations.
 
 I’d design Hostel Kitchen OS as a multi-tenant, multi-campus kitchen operations platform that can be deployed both as a cloud service and on a university’s own servers.
 
@@ -240,8 +240,8 @@ Keep global platform operators separate from institution administrators. A platf
 |`ingredients`|Ingredient identity, category, base unit and status|
 |`ingredient_units`|Allowed units and conversions|
 |`ingredient_scope_settings`|Institution-specific or campus-specific thresholds and rules|
-|`stock_batches`|Received batch, quantity, cost, expiry and status|
-|`stock_balances`|Current quantity by store and batch, if using a maintained balance projection|
+|`stock_batches`|Received batch, quantity, cost, expiry and status (implemented as `StockBatch`; expiry is optional and legacy opening quantities have unknown expiry)|
+|`stock_balances`|Current aggregate quantity by store and ingredient (implemented as `StockBalance`, updated with batch quantities transactionally)|
 |`stock_movements`|Immutable receipts, issues, transfers, waste and adjustments|
 |`stock_reservations`|Quantities reserved for production or other authorized purposes|
 |`stock_transfers`|Transfer header, origin, destination, status and dispatch/receipt details|
@@ -253,11 +253,11 @@ Use `stock_movements` as the authoritative transaction history. If `stock_balanc
 
 |Table|Purpose|
 |---|---|
-|`recipes`|Recipe identity and ownership|
-|`recipe_versions`|Ingredient quantities, serving yield and effective dates|
-|`recipe_ingredients`|Ingredient and quantity per recipe version|
-|`menu_plans`|Planned meal and service date|
-|`menu_plan_items`|Dishes, recipes, quantities and service locations|
+|`recipes`|Recipe identity and ownership (implemented as institution-scoped `Recipe`)|
+|`recipe_versions`|Ingredient quantities and serving yield (implemented as immutable `RecipeVersion` records)|
+|`recipe_ingredients`|Ingredient and quantity per recipe version (implemented with tenant-composite foreign keys)|
+|`menu_plans`|Planned meal and service date (implemented for campus and meal type)|
+|`menu_plan_items`|Pinned recipe version and planned servings per service location|
 |`demand_forecasts`|Expected servings, source, calculation and confidence metadata|
 |`production_runs`|Actual preparation and output|
 |`production_ingredient_issues`|Ingredients issued to a production run|
@@ -635,7 +635,7 @@ Institutions, campuses and access control
 
 Done when: two institutions can share a test deployment, with multiple campuses each, without cross-tenant data access.
 
-**Implementation status: Partial.** First-institution bootstrap, institution/campus records, admin-managed membership and role assignment/revocation, forced change of temporary passwords, revocable hashed sessions, campus-scoped inventory APIs, composite tenant foreign keys, and audit events exist. Isolated MySQL end-to-end flows verified institution and campus isolation. Self-service onboarding for additional institutions, email invitations, role editing, campus assignment changes, comprehensive automated authorization tests, and an institution dashboard remain incomplete; the release acceptance criteria have not been met.
+**Implementation status: Partial.** First-institution bootstrap, institution/campus records, admin-managed membership assignment, role/campus editing and revocation, forced change of temporary passwords, revocable hashed sessions, campus-scoped APIs, composite tenant foreign keys, and audit events exist. System roles include institution administrator, campus manager, kitchen staff, storekeeper, procurement officer, finance officer, and auditor. Membership changes protect against self-lockout and removal of the final administrator. A role-aware shell, operational dashboard, campus/team pages, and administrator audit log exist. Manual MySQL checks verified storekeeper campus scoping, denial of cross-campus queries, denial of prepared-food waste for storekeepers, and restricted audit-log access. Cross-institution automation, self-service onboarding, invitations/recovery, configurable permissions, and complete institutional dashboards remain incomplete.
 
 Release 2
 
@@ -658,7 +658,7 @@ Ingredients, stores, recipes and menus
 
 Done when: a kitchen can plan tomorrow's menu, calculate requirements and identify shortages using real stock.
 
-**Implementation status: Partial.** Institution-owned ingredients, campus stores, stock balances and movements, transactional quantity checks, and reorder-level indicators are implemented. Batch/expiry tracking, recipes and version history, meal schedules, demand planning, and shortage/expiry alerts are not implemented.
+**Implementation status: Partial.** Institution-owned ingredients, campus stores, aggregate balances, stock batches, movement history, expiry tracking, versioned recipes, campus meal plans, publication, stock-backed ingredient requirements, production runs, and ingredient issues are implemented in the API and UI. Recipe versions are immutable; menu items pin a version; demand is calculated at milli-unit precision and compared with campus stock. Stock use is FEFO and transactionally updates batches, balances, movements, and audits. Production issues use the same path and capture cost when batch cost is known; waste can record raw ingredient loss or prepared leftovers. Reservations, production enforcement of calculated menu requirements, meal-service records, and full workflow completion remain.
 
 Release 3
 
@@ -681,7 +681,7 @@ Central and local procurement
 
 Done when: both purchasing models work without double-counting stock or institutional expenditure.
 
-**Implementation status: Not implemented.** Suppliers, purchase requests/orders, approvals, goods receipts, invoices, procurement allocations, and store transfers remain future work.
+**Implementation status: Partial.** The code includes an institution-scoped supplier directory, campus purchase requests, approval/rejection, purchase orders, partial/full goods receipts, competing supplier quotations, award-to-order, and atomic inter-store transfers. Invoice reconciliation checks a single invoice against received quantities and agreed prices; fully received purchase orders only are eligible, and each PO accepts one invoice to prevent duplicate spend. Campus or institution budgets calculate actuals from reconciled invoices. Fresh MySQL testing exercised quote award, priced order, receipt, invoice reconciliation, budget totals, and cross-campus transfer. Configurable approvals, consolidated multi-campus purchase orders, partial invoices, transfer-in-transit states, allocation accounting, and automated tenant/campus tests remain.
 
 Release 4
 
@@ -704,7 +704,7 @@ Production, waste and cost reports
 
 Done when: the institution can compare campus operations using consistent metric definitions.
 
-**Implementation status: Not implemented.** Production runs, waste reporting, budgets, cost-per-meal metrics, consolidated reporting, exports, and printable reports remain future work.
+**Implementation status: Partial.** Production outputs and stock issues, leftover/raw waste with known-cost handling, budget actuals, operational rollups, inventory valuation, campus comparisons, and CSV export are implemented. Cost-per-meal summaries, printable reports, configurable metric definitions, and fully connected shortage-to-production workflow remain.
 
 Release 5
 
@@ -725,7 +725,7 @@ Cloud and self-hosted release
 
 Done when: the same application release can be deployed to a cloud environment and a separate university server.
 
-**Implementation status: Partial.** A reproducible Docker build, Compose MySQL/web deployment, Prisma migration, and liveness/readiness routes exist. Worker deployment, tested restore/rollback procedures, supported upgrade policy, OpenAPI documentation, cloud deployment configuration, and load/security/isolation end-to-end testing remain incomplete.
+**Implementation status: Partial.** Docker build stages, Compose MySQL/web/migration services, committed Prisma migrations, and liveness/readiness routes exist. The production application and Docker image builds pass, and the image responds from its liveness endpoint. Compose deployment and database migration execution were not verified; the Compose CLI is unavailable in this environment. Worker deployment, tested restore/rollback procedures, supported upgrade policy, OpenAPI documentation, cloud deployment configuration, and load/security/isolation end-to-end testing remain incomplete.
 
 Release 6
 
@@ -746,7 +746,7 @@ Advanced analytics and integrations
 
 Done when: advanced features are useful additions, not dependencies for the core kitchen workflow.
 
-**Implementation status: Not implemented.** Forecasting, supplier comparisons, SSO, accounting/hostel integrations, QR attendance, and offline behavior remain future work.
+**Implementation status: Partial.** A transparent linear demand projection over recent recorded stock use, suggested purchasing quantities, and supplier fulfillment/spend comparisons are available through scoped APIs and reports. SSO, accounting/hostel-system adapters, QR attendance, offline behavior, webhook delivery, and institution-specific integration credentials remain future work.
 
 ## 10. Security and reliability acceptance checklist
 
