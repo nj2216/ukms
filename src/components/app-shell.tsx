@@ -23,10 +23,29 @@ const navigation = [
       { href: "/inventory", label: "Stock overview", icon: "layers" },
       { href: "/inventory/ingredients", label: "Ingredients", icon: "leaf" },
       { href: "/inventory/movements", label: "Stock movements", icon: "activity" },
+      { href: "/inventory/expiry", label: "Expiry tracking", icon: "bell" },
       { href: "/inventory/stores", label: "Stores", icon: "store" },
     ],
   },
+  {
+    label: "Kitchen & meal planning",
+    items: [
+      { href: "/kitchen/menus", label: "Meal plans", icon: "grid" },
+      { href: "/kitchen/recipes", label: "Recipes", icon: "leaf" },
+    ],
+  },
 ];
+const navigationHrefs = navigation.flatMap((group) => group.items.map((item) => item.href));
+
+function isPathActive(pathname: string, href: string) {
+  if (pathname === href) return true;
+  const activeChild = navigationHrefs.some((candidate) =>
+    candidate !== href &&
+    candidate.startsWith(`${href}/`) &&
+    (pathname === candidate || pathname.startsWith(`${candidate}/`)),
+  );
+  return pathname.startsWith(`${href}/`) && !activeChild;
+}
 
 const adminNavigation = {
   label: "Administration",
@@ -37,10 +56,10 @@ const adminNavigation = {
 };
 
 const roadmap = [
-  "Menus, recipes & production",
+  "Production records & waste",
   "Purchasing & suppliers",
-  "Batches, expiry & transfers",
-  "Budgets, reports & integrations",
+  "Transfers, budgets & reports",
+  "Advanced analytics & integrations",
 ];
 
 function Icon({ name }: { name: string }) {
@@ -75,7 +94,7 @@ export default function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [lowStockCount, setLowStockCount] = useState(0);
+  const [inventoryAlerts, setInventoryAlerts] = useState({ lowStock: 0, expired: 0, expiring: 0 });
   const [notice, setNotice] = useState("");
 
   const breadcrumb = pathname
@@ -88,14 +107,19 @@ export default function AppShell({
     fetch("/api/v1/dashboard", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return;
-        const result = await response.json() as { metrics?: { reorderAlerts: number } };
-        if (active) setLowStockCount(result.metrics?.reorderAlerts ?? 0);
+        const result = await response.json() as { metrics?: { reorderAlerts: number; expiredBatches: number; expiringBatches: number } };
+        if (active) setInventoryAlerts({
+          lowStock: result.metrics?.reorderAlerts ?? 0,
+          expired: result.metrics?.expiredBatches ?? 0,
+          expiring: result.metrics?.expiringBatches ?? 0,
+        });
       })
       .catch(() => {
         if (active) setNotice("Alerts could not be refreshed.");
       });
     return () => { active = false; };
   }, []);
+  const inventoryAlertCount = inventoryAlerts.lowStock + inventoryAlerts.expired + inventoryAlerts.expiring;
 
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -131,14 +155,14 @@ export default function AppShell({
           <span className="tenant-chevron"><Icon name="chevron" /></span>
         </div>
         <nav className="side-nav">
-          {navigation.map((group) => (
+          {navigation.filter((group) => group.label !== "Kitchen & meal planning" || user.role !== "STOREKEEPER").map((group) => (
             <div className="nav-group" key={group.label}>
               <p className="nav-label">{group.label}</p>
               {group.items.map((item) => (
                 <Link
                   aria-label={item.label}
-                  aria-current={pathname === item.href ? "page" : undefined}
-                  className={`nav-link${pathname === item.href ? " active" : ""}`}
+                  aria-current={isPathActive(pathname, item.href) ? "page" : undefined}
+                  className={`nav-link${isPathActive(pathname, item.href) ? " active" : ""}`}
                   href={item.href}
                   key={item.href}
                   onClick={() => setSidebarOpen(false)}
@@ -155,8 +179,8 @@ export default function AppShell({
               {adminNavigation.items.map((item) => (
                 <Link
                   aria-label={item.label}
-                  aria-current={pathname === item.href ? "page" : undefined}
-                  className={`nav-link${pathname === item.href ? " active" : ""}`}
+                  aria-current={isPathActive(pathname, item.href) ? "page" : undefined}
+                  className={`nav-link${isPathActive(pathname, item.href) ? " active" : ""}`}
                   href={item.href}
                   key={item.href}
                   onClick={() => setSidebarOpen(false)}
@@ -190,10 +214,10 @@ export default function AppShell({
           </div>
           <div className="topbar-actions">
             <div className="popover-wrap">
-              <button className="icon-button notification-button" aria-label={`Notifications, ${lowStockCount} low-stock alerts`} aria-expanded={alertsOpen} onClick={() => { setAlertsOpen((value) => !value); setAccountOpen(false); }}>
-                <Icon name="bell" />{lowStockCount > 0 && <span className="notification-dot">{lowStockCount > 9 ? "9+" : lowStockCount}</span>}
+              <button className="icon-button notification-button" aria-label={`Notifications, ${inventoryAlertCount} inventory alerts`} aria-expanded={alertsOpen} onClick={() => { setAlertsOpen((value) => !value); setAccountOpen(false); }}>
+                <Icon name="bell" />{inventoryAlertCount > 0 && <span className="notification-dot">{inventoryAlertCount > 9 ? "9+" : inventoryAlertCount}</span>}
               </button>
-              {alertsOpen && <div className="popover alert-popover"><strong>Stock alerts</strong>{lowStockCount > 0 ? <Link href="/inventory" onClick={() => setAlertsOpen(false)}>{lowStockCount} item{lowStockCount === 1 ? "" : "s"} at or below reorder level</Link> : <p>No low-stock alerts right now.</p>}</div>}
+              {alertsOpen && <div className="popover alert-popover"><strong>Inventory alerts</strong>{inventoryAlerts.lowStock > 0 && <Link href="/inventory" onClick={() => setAlertsOpen(false)}>{inventoryAlerts.lowStock} stock position{inventoryAlerts.lowStock === 1 ? "" : "s"} at or below reorder level</Link>}{inventoryAlerts.expired > 0 && <Link href="/inventory/expiry" onClick={() => setAlertsOpen(false)}>{inventoryAlerts.expired} expired batch{inventoryAlerts.expired === 1 ? "" : "es"} with stock</Link>}{inventoryAlerts.expiring > 0 && <Link href="/inventory/expiry" onClick={() => setAlertsOpen(false)}>{inventoryAlerts.expiring} batch{inventoryAlerts.expiring === 1 ? "" : "es"} expiring within 30 days</Link>}{inventoryAlertCount === 0 && <p>No inventory alerts right now.</p>}</div>}
             </div>
             <div className="popover-wrap">
               <button className="profile-button" aria-label={`Account: ${user.name}`} aria-expanded={accountOpen} onClick={() => { setAccountOpen((value) => !value); setAlertsOpen(false); }}>

@@ -1,8 +1,8 @@
 # Hostel Kitchen OS
 
-Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, an ingredient catalog, an auditable stock ledger, stock and movement pages, and a role-aware application shell with live inventory alerts.
+Hostel Kitchen OS is a multi-tenant kitchen operations application. The current release provides first-institution setup, secure sessions, institution/campus-scoped access, campus and store setup, an ingredient catalog, batch-aware stock movements with expiry tracking, and a role-aware application shell with live inventory alerts.
 
-> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Recipes, menus, procurement, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See the roadmap status annotations for the exact release state.
+> **Implementation status:** this is a working foundation, not the completed product described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Procurement, production, finance, email invitations/password recovery, worker jobs, and integrations are not implemented. See the roadmap status annotations for the exact release state.
 
 ## Requirements
 
@@ -85,11 +85,12 @@ Health endpoints are `/api/health/live` and `/api/health/ready`. Readiness check
 ## Current workflows and security boundaries
 
 - The first-run setup creates one institution, its first campus, the institution administrator, and a main store in a transaction. The bootstrap endpoint requires a configured one-time secret of at least 32 characters and is permanently disabled after setup.
-- Signed-in users land on a protected workspace with role-aware navigation. The available pages cover the live overview, inventory balances, ingredients, stock movements, and stores; institution administrators also have campus and team access pages. Recipe planning, procurement, production, finance, and reporting are not exposed as working modules because their backend workflows are not implemented yet.
+- Signed-in users land on a protected workspace with role-aware navigation. The available pages cover the live overview, inventory balances, ingredients, stock movements, batch expiry tracking, recipes and versions, campus meal plans, and stock-backed ingredient requirements; institution administrators also have campus and team access pages. Procurement, production, finance, and reporting are not exposed as working modules because their backend workflows are not implemented yet.
 - Passwords use Node.js `scrypt`; sessions use random opaque tokens in `HttpOnly`, `SameSite=Lax` cookies. Only a SHA-256 token hash is stored, and sessions expire after 12 hours.
 - Memberships select an institution and role. Campus-scoped memberships are restricted to their assigned campus; institution administrators have institution-wide access.
 - Tenant identity is included in inventory queries and composite foreign keys prevent stock records from referencing another tenant's stores or ingredients.
-- Stock changes are written to an immutable movement ledger and update a maintained balance in the same database transaction. Issues, waste, and negative adjustments cannot make stock negative. Every stock mutation and initial setup creates an audit event.
+- Stock changes are written to an immutable movement ledger and update maintained balance and batch quantities in the same database transaction. Receipts capture optional lot codes and expiry dates; issues consume earliest-expiring, non-expired batches, while waste and negative adjustments can consume expired stock. No movement can make stock negative. Every stock mutation and initial setup creates an audit event. Existing balances are migrated into opening batches without invented expiry dates.
+- Recipes use immutable versions with exact base-unit ingredient quantities and serving yields. Campus meal plans pin a recipe version; demand is rounded up to the nearest 0.001 unit and compared with non-expired stock for that campus. Publishing a plan and calculating shortages do not reserve or issue stock.
 - State-changing API calls require same-origin requests. Login failures lock an account for 15 minutes after eight failed attempts.
 - The database should be reachable only from the application. Configure the reverse proxy to preserve the external `Host` and overwrite `X-Forwarded-Proto`; state-changing APIs compare both with the browser `Origin`. Use HTTPS at the reverse proxy and database TLS (`DATABASE_SSL=true`) for remote MySQL servers.
 
@@ -122,6 +123,9 @@ The current versioned routes are:
 - `GET|POST /api/v1/stores`
 - `GET|POST /api/v1/ingredients`
 - `GET /api/v1/inventory`, `GET|POST /api/v1/inventory/movements`
+- `GET /api/v1/inventory/batches` (scoped expiring/expired batches with a configurable 1–365 day window)
+- `GET|POST /api/v1/recipes`, `POST /api/v1/recipes/:id/versions`
+- `GET|POST /api/v1/menu-plans`, `PATCH /api/v1/menu-plans/:id` (publish), `GET /api/v1/menu-plans/:id/requirements`
 - `GET /api/v1/dashboard` (institution/campus-scoped live counts, reorder alerts, and recent activity)
 
 List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. There is not yet a maintained OpenAPI specification or comprehensive automated integration/authorization test suite.

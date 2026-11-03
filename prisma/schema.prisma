@@ -26,19 +26,34 @@ enum StockMovementKind {
   ADJUSTMENT
 }
 
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum MenuPlanStatus {
+  DRAFT
+  PUBLISHED
+}
+
 model Institution {
-  id          String       @id @default(cuid()) @db.VarChar(191)
-  name        String       @db.VarChar(191)
-  slug        String       @unique @db.VarChar(191)
-  timezone    String       @default("UTC") @db.VarChar(64)
-  currency    String       @default("USD") @db.Char(3)
-  createdAt   DateTime     @default(now())
+  id          String          @id @default(cuid()) @db.VarChar(191)
+  name        String          @db.VarChar(191)
+  slug        String          @unique @db.VarChar(191)
+  timezone    String          @default("UTC") @db.VarChar(64)
+  currency    String          @default("USD") @db.Char(3)
+  createdAt   DateTime        @default(now())
   campuses    Campus[]
   memberships Membership[]
   ingredients Ingredient[]
   stores      Store[]
   movements   StockMovement[]
   balances    StockBalance[]
+  batches     StockBatch[]
+  recipes     Recipe[]
+  menuPlans   MenuPlan[]
   auditEvents AuditEvent[]
 }
 
@@ -56,6 +71,7 @@ model Campus {
   institution   Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   memberships   Membership[]
   stores        Store[]
+  menuPlans     MenuPlan[]
 
   @@unique([institutionId, code])
   @@unique([id, institutionId])
@@ -68,7 +84,7 @@ model User {
   name                String       @db.VarChar(191)
   passwordHash        String       @db.VarChar(255)
   active              Boolean      @default(true)
-  mustChangePassword Boolean      @default(false)
+  mustChangePassword  Boolean      @default(false)
   failedLoginAttempts Int          @default(0)
   lockedUntil         DateTime?
   createdAt           DateTime     @default(now())
@@ -78,14 +94,14 @@ model User {
 }
 
 model Membership {
-  id            String          @id @default(cuid()) @db.VarChar(191)
-  userId        String          @db.VarChar(191)
-  institutionId String          @db.VarChar(191)
-  campusId      String?         @db.VarChar(191)
-  role          MembershipRole  @default(CAMPUS_MANAGER)
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  institution   Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  campus        Campus?          @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  id            String         @id @default(cuid()) @db.VarChar(191)
+  userId        String         @db.VarChar(191)
+  institutionId String         @db.VarChar(191)
+  campusId      String?        @db.VarChar(191)
+  role          MembershipRole @default(CAMPUS_MANAGER)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  campus        Campus?        @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Cascade)
   sessions      Session[]
 
   @@unique([userId, institutionId])
@@ -107,16 +123,18 @@ model Session {
 }
 
 model Ingredient {
-  id            String          @id @default(cuid()) @db.VarChar(191)
-  institutionId String          @db.VarChar(191)
-  name          String          @db.VarChar(191)
-  unit          String          @db.VarChar(32)
-  reorderLevel  Decimal         @default(0) @db.Decimal(12, 3)
-  active        Boolean         @default(true)
-  createdAt     DateTime        @default(now())
-  institution   Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  balances      StockBalance[]
-  movements     StockMovement[]
+  id                String             @id @default(cuid()) @db.VarChar(191)
+  institutionId     String             @db.VarChar(191)
+  name              String             @db.VarChar(191)
+  unit              String             @db.VarChar(32)
+  reorderLevel      Decimal            @default(0) @db.Decimal(12, 3)
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  institution       Institution        @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  balances          StockBalance[]
+  movements         StockMovement[]
+  batches           StockBatch[]
+  recipeIngredients RecipeIngredient[]
 
   @@unique([institutionId, name])
   @@unique([id, institutionId])
@@ -133,6 +151,7 @@ model Store {
   campus        Campus          @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Cascade)
   balances      StockBalance[]
   movements     StockMovement[]
+  batches       StockBatch[]
 
   @@unique([id, institutionId])
   @@unique([campusId, name])
@@ -140,18 +159,40 @@ model Store {
 }
 
 model StockBalance {
-  id            String       @id @default(cuid()) @db.VarChar(191)
-  institutionId String       @db.VarChar(191)
-  storeId       String       @db.VarChar(191)
-  ingredientId  String       @db.VarChar(191)
-  onHand        Decimal      @default(0) @db.Decimal(12, 3)
-  updatedAt     DateTime     @updatedAt
-  institution   Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  store         Store        @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Cascade)
-  ingredient    Ingredient   @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  id            String      @id @default(cuid()) @db.VarChar(191)
+  institutionId String      @db.VarChar(191)
+  storeId       String      @db.VarChar(191)
+  ingredientId  String      @db.VarChar(191)
+  onHand        Decimal     @default(0) @db.Decimal(12, 3)
+  updatedAt     DateTime    @updatedAt
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  store         Store       @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  ingredient    Ingredient  @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Cascade)
 
   @@unique([storeId, ingredientId])
   @@index([institutionId, ingredientId])
+}
+
+model StockBatch {
+  id                String          @id @default(cuid()) @db.VarChar(191)
+  institutionId     String          @db.VarChar(191)
+  storeId           String          @db.VarChar(191)
+  ingredientId      String          @db.VarChar(191)
+  batchCode         String          @db.VarChar(100)
+  expiryDate        DateTime?       @db.Date
+  receivedQuantity  Decimal         @db.Decimal(12, 3)
+  remainingQuantity Decimal         @db.Decimal(12, 3)
+  unitCost          Decimal?        @db.Decimal(12, 4)
+  receivedAt        DateTime        @default(now())
+  createdAt         DateTime        @default(now())
+  institution       Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  store             Store           @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  ingredient        Ingredient      @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  movements         StockMovement[]
+
+  @@unique([id, institutionId])
+  @@index([institutionId, storeId, ingredientId, expiryDate])
+  @@index([institutionId, expiryDate, remainingQuantity])
 }
 
 model StockMovement {
@@ -159,6 +200,7 @@ model StockMovement {
   institutionId String            @db.VarChar(191)
   storeId       String            @db.VarChar(191)
   ingredientId  String            @db.VarChar(191)
+  batchId       String?           @db.VarChar(191)
   kind          StockMovementKind
   quantity      Decimal           @db.Decimal(12, 3)
   note          String?           @db.VarChar(500)
@@ -166,21 +208,97 @@ model StockMovement {
   institution   Institution       @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   store         Store             @relation(fields: [storeId, institutionId], references: [id, institutionId], onDelete: Restrict)
   ingredient    Ingredient        @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Restrict)
+  batch         StockBatch?       @relation(fields: [batchId, institutionId], references: [id, institutionId], onDelete: Restrict)
 
   @@index([institutionId, storeId, createdAt])
   @@index([institutionId, ingredientId, createdAt])
+  @@index([batchId, institutionId])
+}
+
+model Recipe {
+  id            String          @id @default(cuid()) @db.VarChar(191)
+  institutionId String          @db.VarChar(191)
+  name          String          @db.VarChar(191)
+  description   String?         @db.VarChar(500)
+  active        Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  institution   Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  versions      RecipeVersion[]
+
+  @@unique([id, institutionId])
+  @@unique([institutionId, name])
+  @@index([institutionId, active, name])
+}
+
+model RecipeVersion {
+  id            String             @id @default(cuid()) @db.VarChar(191)
+  institutionId String             @db.VarChar(191)
+  recipeId      String             @db.VarChar(191)
+  versionNumber Int
+  servingYield  Int
+  createdAt     DateTime           @default(now())
+  recipe        Recipe             @relation(fields: [recipeId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  ingredients   RecipeIngredient[]
+  menuItems     MenuPlanItem[]
+
+  @@unique([id, institutionId])
+  @@unique([recipeId, versionNumber])
+  @@index([institutionId, recipeId, versionNumber])
+}
+
+model RecipeIngredient {
+  id              String        @id @default(cuid()) @db.VarChar(191)
+  institutionId   String        @db.VarChar(191)
+  recipeVersionId String        @db.VarChar(191)
+  ingredientId    String        @db.VarChar(191)
+  quantity        Decimal       @db.Decimal(12, 3)
+  recipeVersion   RecipeVersion @relation(fields: [recipeVersionId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  ingredient      Ingredient    @relation(fields: [ingredientId, institutionId], references: [id, institutionId], onDelete: Restrict)
+
+  @@unique([recipeVersionId, ingredientId])
+  @@index([institutionId, ingredientId])
+}
+
+model MenuPlan {
+  id            String         @id @default(cuid()) @db.VarChar(191)
+  institutionId String         @db.VarChar(191)
+  campusId      String         @db.VarChar(191)
+  name          String         @db.VarChar(191)
+  mealType      MealType
+  serviceDate   DateTime       @db.Date
+  status        MenuPlanStatus @default(DRAFT)
+  createdAt     DateTime       @default(now())
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  campus        Campus         @relation(fields: [campusId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  items         MenuPlanItem[]
+
+  @@unique([id, institutionId])
+  @@index([institutionId, campusId, serviceDate])
+}
+
+model MenuPlanItem {
+  id              String        @id @default(cuid()) @db.VarChar(191)
+  institutionId   String        @db.VarChar(191)
+  menuPlanId      String        @db.VarChar(191)
+  recipeVersionId String        @db.VarChar(191)
+  plannedServings Int
+  menuPlan        MenuPlan      @relation(fields: [menuPlanId, institutionId], references: [id, institutionId], onDelete: Cascade)
+  recipeVersion   RecipeVersion @relation(fields: [recipeVersionId, institutionId], references: [id, institutionId], onDelete: Restrict)
+
+  @@unique([menuPlanId, recipeVersionId])
+  @@index([institutionId, recipeVersionId])
 }
 
 model AuditEvent {
-  id            String       @id @default(cuid()) @db.VarChar(191)
-  institutionId String       @db.VarChar(191)
-  actorId       String?      @db.VarChar(191)
-  action        String       @db.VarChar(100)
-  entityType    String       @db.VarChar(100)
-  entityId      String       @db.VarChar(191)
-  createdAt     DateTime     @default(now())
-  institution   Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  actor         User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  id            String      @id @default(cuid()) @db.VarChar(191)
+  institutionId String      @db.VarChar(191)
+  actorId       String?     @db.VarChar(191)
+  action        String      @db.VarChar(100)
+  entityType    String      @db.VarChar(100)
+  entityId      String      @db.VarChar(191)
+  createdAt     DateTime    @default(now())
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  actor         User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([institutionId, createdAt])
   @@index([actorId, createdAt])

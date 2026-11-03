@@ -240,8 +240,8 @@ Keep global platform operators separate from institution administrators. A platf
 |`ingredients`|Ingredient identity, category, base unit and status|
 |`ingredient_units`|Allowed units and conversions|
 |`ingredient_scope_settings`|Institution-specific or campus-specific thresholds and rules|
-|`stock_batches`|Received batch, quantity, cost, expiry and status|
-|`stock_balances`|Current quantity by store and batch, if using a maintained balance projection|
+|`stock_batches`|Received batch, quantity, cost, expiry and status (implemented as `StockBatch`; expiry is optional and legacy opening quantities have unknown expiry)|
+|`stock_balances`|Current aggregate quantity by store and ingredient (implemented as `StockBalance`, updated with batch quantities transactionally)|
 |`stock_movements`|Immutable receipts, issues, transfers, waste and adjustments|
 |`stock_reservations`|Quantities reserved for production or other authorized purposes|
 |`stock_transfers`|Transfer header, origin, destination, status and dispatch/receipt details|
@@ -253,11 +253,11 @@ Use `stock_movements` as the authoritative transaction history. If `stock_balanc
 
 |Table|Purpose|
 |---|---|
-|`recipes`|Recipe identity and ownership|
-|`recipe_versions`|Ingredient quantities, serving yield and effective dates|
-|`recipe_ingredients`|Ingredient and quantity per recipe version|
-|`menu_plans`|Planned meal and service date|
-|`menu_plan_items`|Dishes, recipes, quantities and service locations|
+|`recipes`|Recipe identity and ownership (implemented as institution-scoped `Recipe`)|
+|`recipe_versions`|Ingredient quantities and serving yield (implemented as immutable `RecipeVersion` records)|
+|`recipe_ingredients`|Ingredient and quantity per recipe version (implemented with tenant-composite foreign keys)|
+|`menu_plans`|Planned meal and service date (implemented for campus and meal type)|
+|`menu_plan_items`|Pinned recipe version and planned servings per service location|
 |`demand_forecasts`|Expected servings, source, calculation and confidence metadata|
 |`production_runs`|Actual preparation and output|
 |`production_ingredient_issues`|Ingredients issued to a production run|
@@ -658,7 +658,7 @@ Ingredients, stores, recipes and menus
 
 Done when: a kitchen can plan tomorrow's menu, calculate requirements and identify shortages using real stock.
 
-**Implementation status: Partial.** Institution-owned ingredients, campus stores, stock balances and movements, paginated movement history, transactional quantity checks, ingredient search, and stock/reorder views are implemented in the API and UI. On a temporary MySQL database, browser testing exercised ingredient creation, stock receipt and issue, and the resulting dashboard reorder alert. Batch/expiry tracking, recipes and version history, meal schedules, demand planning, and shortage/expiry actions are not implemented.
+**Implementation status: Partial.** Institution-owned ingredients, campus stores, aggregate stock balances, stock batches, paginated movement history, expiry tracking, versioned recipes, campus meal plans, publication, and stock-backed ingredient requirements are implemented in the API and UI. Recipe versions are immutable, and each menu item pins a specific version. Demand is aggregated at milli-unit precision, rounded up to avoid underestimating requirements, and compared with non-expired stock for the menu's campus. Receipts create lots and movements atomically; issues consume non-expired lots FEFO, while waste and negative adjustments can consume expired stock. The dashboard and expiry page expose scoped expired/expiring alerts. The additive migration backfills existing positive balances into batches with unknown expiry; historical movements remain unallocated. Procurement/reservation actions, production runs, and full kitchen completion remain unimplemented.
 
 Release 3
 

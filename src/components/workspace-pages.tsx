@@ -23,6 +23,16 @@ type Balance = {
   store: Store;
   ingredient: Ingredient;
 };
+type StockBatch = {
+  id: string;
+  batchCode: string;
+  expiryDate: string;
+  remainingQuantity: string;
+  receivedQuantity: string;
+  daysUntilExpiry: number;
+  store: { name: string; campus: { id: string; name: string } };
+  ingredient: { name: string; unit: string };
+};
 type Movement = {
   id: string;
   kind: string;
@@ -31,6 +41,7 @@ type Movement = {
   createdAt: string;
   store: { name: string; campus: { name: string } };
   ingredient: { name: string; unit: string };
+  batch: { batchCode: string; expiryDate: string | null } | null;
 };
 type Membership = {
   id: string;
@@ -98,6 +109,72 @@ export default function InventoryPage() {
         )}
       </Panel>
       <div className="next-step-card"><div><strong>Continue the inventory workflow</strong><p>Receive or issue stock, then review the auditable movement history.</p></div><Link className="button-secondary" href="/inventory/movements">View stock movements</Link></div>
+    </>
+  );
+}
+
+export function ExpiryPage() {
+  const [campusId, setCampusId] = useState("");
+  const [days, setDays] = useState(30);
+  const [items, setItems] = useState<StockBatch[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState("");
+  const campuses = useResource<{ campuses: Campus[] }>("/api/v1/campuses", 0);
+  const endpoint = `/api/v1/inventory/batches?days=${days}${campusId ? `&campusId=${encodeURIComponent(campusId)}` : ""}`;
+  const { data, error, loading } = useResource<{
+    batches: StockBatch[];
+    expiredCount: number;
+    expiringCount: number;
+    nextCursor: string | null;
+  }>(endpoint, 0);
+
+  useEffect(() => {
+    setItems(data?.batches ?? []);
+    setCursor(data?.nextCursor ?? null);
+  }, [data]);
+
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    setLoadMoreError("");
+    try {
+      const result = await requestJson<{ batches: StockBatch[]; nextCursor: string | null }>(`${endpoint}&cursor=${encodeURIComponent(cursor)}`);
+      setItems((current) => [...current, ...result.batches]);
+      setCursor(result.nextCursor);
+    } catch (reason) {
+      setLoadMoreError(reason instanceof Error ? reason.message : "Could not load more batches.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader eyebrow="Inventory & stock" title="Expiry tracking" description="Prioritize expired and soon-to-expire stock by campus, store, and ingredient." action={<Link className="button-secondary" href="/inventory/movements">Record stock issue</Link>} />
+      {error && <Notice error>{error}</Notice>}
+      <div className="metric-grid metric-grid-compact">
+        <article className={`metric-card${(data?.expiredCount ?? 0) > 0 ? " metric-warning" : ""}`}><span>Expired batches</span><strong>{loading ? "—" : data?.expiredCount ?? 0}</strong><small>On-hand lots past their expiry date</small></article>
+        <article className="metric-card"><span>Expiring soon</span><strong>{loading ? "—" : data?.expiringCount ?? 0}</strong><small>Within the selected time window</small></article>
+        <article className="metric-card metric-link-card"><span>Next step</span><strong>Issue eligible stock</strong><small>Stock issues consume earliest-expiring lots first</small><Link href="/inventory/movements">Open movement workflow →</Link></article>
+      </div>
+      <Panel title="Batches requiring attention" description="Only batches with remaining stock and an expiry date in the selected window are listed.">
+        {campuses.error && <Notice error>{campuses.error}</Notice>}
+        {loadMoreError && <Notice error>{loadMoreError}</Notice>}
+        <div className="search-bar">
+          {campuses.data?.campuses && campuses.data.campuses.length > 1 && <label className="filter-field">Campus<select value={campusId} onChange={(event) => setCampusId(event.target.value)}><option value="">All authorized campuses</option>{campuses.data.campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select></label>}
+          <label className="filter-field">Expiry window<select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={7}>Next 7 days</option><option value={30}>Next 30 days</option><option value={90}>Next 90 days</option><option value={365}>Next year</option></select></label>
+        </div>
+        {loading ? <LoadingState /> : !error && items.length === 0 ? <EmptyState title="No batches need attention">No on-hand lots are expired or expiring within this window.</EmptyState> : !error && (
+          <>
+            <TableFrame><thead><tr><th>Ingredient</th><th>Batch</th><th>Campus / store</th><th>Remaining</th><th>Expiry</th><th>Status</th></tr></thead><tbody>
+              {items.map((batch) => <tr key={batch.id}><td><strong>{batch.ingredient.name}</strong><small>{batch.ingredient.unit}</small></td><td>{batch.batchCode}</td><td>{batch.store.campus.name} · {batch.store.name}</td><td>{batch.remainingQuantity} {batch.ingredient.unit}</td><td>{batch.expiryDate.slice(0, 10)}</td><td><StatusBadge tone={batch.daysUntilExpiry < 0 ? "warning" : batch.daysUntilExpiry <= 7 ? "warning" : "neutral"}>{batch.daysUntilExpiry < 0 ? `${Math.abs(batch.daysUntilExpiry)} days expired` : batch.daysUntilExpiry === 0 ? "Expires today" : `${batch.daysUntilExpiry} days left`}</StatusBadge></td></tr>)}
+            </tbody></TableFrame>
+            {cursor && <button className="button-secondary load-more" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "Loading…" : "Load more batches"}</button>}
+          </>
+        )}
+      </Panel>
+      <p className="capability-note">Opening balances migrated from earlier releases have no known expiry date and are intentionally excluded from this report.</p>
     </>
   );
 }
@@ -191,6 +268,7 @@ export function MovementsPage({ role }: { role: string }) {
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState(false);
   const [campusId, setCampusId] = useState("");
+  const [kind, setKind] = useState(role === "KITCHEN_STAFF" ? "ISSUE" : "RECEIPT");
   const endpoint = `/api/v1/inventory/movements${campusId ? `?campusId=${encodeURIComponent(campusId)}` : ""}`;
   const { data, error, loading } = useResource<{ movements: Movement[]; nextCursor: string | null }>(endpoint, refreshKey);
   const storesResource = useResource<{ stores: Store[] }>("/api/v1/stores", 0);
@@ -212,6 +290,7 @@ export function MovementsPage({ role }: { role: string }) {
     try {
       await requestJson("/api/v1/inventory/movements", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(form).entries())) });
       form.reset();
+      setKind(role === "KITCHEN_STAFF" ? "ISSUE" : "RECEIPT");
       setActionMessage("Stock movement recorded and balance updated.");
       setRefreshKey((key) => key + 1);
     } catch (reason) {
@@ -254,8 +333,10 @@ export function MovementsPage({ role }: { role: string }) {
           <form className="record-form" onSubmit={(event) => void recordMovement(event)}>
             <label>Store<select name="storeId" required defaultValue=""><option value="" disabled>Select a store</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.campus.name} · {store.name}</option>)}</select></label>
             <label>Ingredient<select name="ingredientId" required defaultValue=""><option value="" disabled>Select an ingredient</option>{ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}</select></label>
-            <label>Movement type<select name="kind" required>{kindOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label>Movement type<select name="kind" required value={kind} onChange={(event) => setKind(event.target.value)}>{kindOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label>Quantity<input name="quantity" type="number" step="0.001" required placeholder={role === "KITCHEN_STAFF" ? "Quantity to issue" : "Positive quantity"} /></label>
+            {kind === "RECEIPT" && <label>Batch code (optional)<input name="batchCode" maxLength={100} placeholder="Supplier lot or delivery reference" /></label>}
+            {kind === "RECEIPT" && <label>Expiry date (optional)<input name="expiryDate" type="date" /></label>}
             <label className="record-form-wide">Note (optional)<input name="note" maxLength={500} placeholder="Reason or reference" /></label>
             <button className="button-primary" type="submit">Record movement</button>
           </form>
@@ -266,8 +347,8 @@ export function MovementsPage({ role }: { role: string }) {
         {campusesResource.data?.campuses && campusesResource.data.campuses.length > 1 && <label className="filter-field">Campus<select value={campusId} onChange={(event) => setCampusId(event.target.value)}><option value="">All authorized campuses</option>{campusesResource.data.campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}</select></label>}
         {error ? <Notice error>{error}</Notice> : loading ? <LoadingState /> : items.length === 0 ? <EmptyState title="No stock movements yet">The first receipt, issue, waste record, or adjustment will appear here.</EmptyState> : (
           <>
-            <TableFrame><thead><tr><th>Date</th><th>Type</th><th>Ingredient</th><th>Campus / store</th><th>Quantity</th><th>Note</th></tr></thead><tbody>
-              {items.map((item) => <tr key={item.id}><td>{formatDateTime(item.createdAt)}</td><td><StatusBadge tone={item.kind === "RECEIPT" ? "positive" : item.kind === "WASTE" ? "warning" : "neutral"}>{item.kind.toLowerCase()}</StatusBadge></td><td><strong>{item.ingredient.name}</strong><small>{item.ingredient.unit}</small></td><td>{item.store.campus.name} · {item.store.name}</td><td>{item.quantity} {item.ingredient.unit}</td><td>{item.note || "—"}</td></tr>)}
+            <TableFrame><thead><tr><th>Date</th><th>Type</th><th>Ingredient</th><th>Campus / store</th><th>Batch</th><th>Quantity</th><th>Note</th></tr></thead><tbody>
+              {items.map((item) => <tr key={item.id}><td>{formatDateTime(item.createdAt)}</td><td><StatusBadge tone={item.kind === "RECEIPT" ? "positive" : item.kind === "WASTE" ? "warning" : "neutral"}>{item.kind.toLowerCase()}</StatusBadge></td><td><strong>{item.ingredient.name}</strong><small>{item.ingredient.unit}</small></td><td>{item.store.campus.name} · {item.store.name}</td><td>{item.batch ? <>{item.batch.batchCode}{item.batch.expiryDate ? <small>Expires {item.batch.expiryDate.slice(0, 10)}</small> : null}</> : "Untracked legacy stock"}</td><td>{item.quantity} {item.ingredient.unit}</td><td>{item.note || "—"}</td></tr>)}
             </tbody></TableFrame>
             {cursor && <button className="button-secondary load-more" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? "Loading…" : "Load older movements"}</button>}
           </>

@@ -35,6 +35,51 @@ export function movementQuantity(kind: StockKind, value: string): string | null 
   return kind === "RECEIPT" ? value : `-${value}`;
 }
 
+export function allocateStockBatches(
+  batches: Array<{ id: string; remainingQuantity: string }>,
+  requestedQuantity: string,
+): Array<{ batchId: string; quantity: string }> | null {
+  const requested = toMilliUnits(requestedQuantity);
+  if (requested === null || requested <= 0n) return null;
+
+  let remaining = requested;
+  const allocations: Array<{ batchId: string; quantity: string }> = [];
+  for (const batch of batches) {
+    const available = toMilliUnits(batch.remainingQuantity);
+    if (available === null || available <= 0n) continue;
+    const allocated = available < remaining ? available : remaining;
+    allocations.push({ batchId: batch.id, quantity: formatMilliUnits(allocated) });
+    remaining -= allocated;
+    if (remaining === 0n) return allocations;
+  }
+  return null;
+}
+
+export function calculateDemandQuantity(
+  quantityPerYield: string,
+  servingYield: number,
+  plannedServings: number,
+): string | null {
+  const quantity = toMilliUnits(quantityPerYield);
+  if (
+    quantity === null ||
+    quantity <= 0n ||
+    !Number.isSafeInteger(servingYield) ||
+    servingYield <= 0 ||
+    !Number.isSafeInteger(plannedServings) ||
+    plannedServings <= 0
+  ) return null;
+  const denominator = BigInt(servingYield);
+  const numerator = quantity * BigInt(plannedServings);
+  return formatMilliUnits((numerator + denominator - 1n) / denominator);
+}
+
+export function formatMilliUnits(value: bigint): string {
+  const whole = value / 1000n;
+  const fraction = String(value % 1000n).padStart(3, "0").replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : String(whole);
+}
+
 export function campusScope(
   membership: { role: string; campusId: string | null },
   requestedCampusId?: string | null,

@@ -12,8 +12,16 @@ export async function GET(request: Request) {
     const campusCondition = campusId
       ? Prisma.sql`AND store.campusId = ${campusId}`
       : Prisma.empty;
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const expiryWindowEnd = new Date(todayStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const batchScope = {
+      institutionId,
+      remainingQuantity: { gt: 0 },
+      ...(campusId ? { store: { campusId } } : {}),
+    };
 
-    const [counts, lowStock, ingredientCount, storeCount, movementCount, recentMovements] =
+    const [counts, lowStock, ingredientCount, storeCount, movementCount, recentMovements, expiredBatches, expiringBatches, expiryAttention] =
       await Promise.all([
         prisma.$queryRaw<Array<{ stockPositions: bigint; reorderAlerts: bigint }>>`
           SELECT
@@ -82,7 +90,41 @@ export async function GET(request: Request) {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 6,
         }),
+        prisma.stockBatch.count({
+          where: { ...batchScope, expiryDate: { lt: todayStart } },
+        }),
+        prisma.stockBatch.count({
+          where: {
+            ...batchScope,
+            expiryDate: { gte: todayStart, lte: expiryWindowEnd },
+          },
+        }),
+        prisma.stockBatch.findMany({
+          where: {
+            ...batchScope,
+            expiryDate: { lte: expiryWindowEnd },
+          },
+          select: {
+            id: true,
+            batchCode: true,
+            expiryDate: true,
+            remainingQuantity: true,
+            store: { select: { name: true, campus: { select: { name: true } } } },
+            ingredient: { select: { name: true, unit: true } },
+          },
+          orderBy: [{ expiryDate: "asc" }, { id: "asc" }],
+          take: 6,
+        }),
       ]);
+
+    const expiryAttentionRows = expiryAttention.map((batch) => {
+      const expiryDate = batch.expiryDate!;
+      const dateOnly = new Date(Date.UTC(expiryDate.getUTCFullYear(), expiryDate.getUTCMonth(), expiryDate.getUTCDate()));
+      return {
+        ...batch,
+        daysUntilExpiry: Math.floor((dateOnly.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000)),
+      };
+    });
 
     return NextResponse.json({
       metrics: {
@@ -91,12 +133,15 @@ export async function GET(request: Request) {
         ingredients: ingredientCount,
         stores: storeCount,
         movements: movementCount,
+        expiredBatches,
+        expiringBatches,
       },
       lowStock: lowStock.map((item) => ({
         ...item,
         belowReorderLevel: true,
       })),
       recentMovements,
+      expiryAttention: expiryAttentionRows,
       campusName: session.membership.campus?.name ?? null,
     });
   } catch (error) {

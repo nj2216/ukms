@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  allocateStockBatches,
   campusScope,
+  calculateDemandQuantity,
   membershipAccessChangeError,
   movementQuantity,
   normalizeEmail,
@@ -37,6 +39,32 @@ test("movement signs match inventory ledger semantics", () => {
   assert.equal(movementQuantity("ISSUE", "-1"), null);
   assert.equal(movementQuantity("ADJUSTMENT", "-0.125"), "-0.125");
   assert.equal(movementQuantity("ADJUSTMENT", "0"), null);
+});
+
+test("stock issues allocate earliest batches first without exceeding their balances", () => {
+  assert.deepEqual(
+    allocateStockBatches(
+      [
+        { id: "earliest", remainingQuantity: "0.75" },
+        { id: "next", remainingQuantity: "1.5" },
+        { id: "later", remainingQuantity: "3" },
+      ],
+      "2.125",
+    ),
+    [
+      { batchId: "earliest", quantity: "0.75" },
+      { batchId: "next", quantity: "1.375" },
+    ],
+  );
+  assert.equal(allocateStockBatches([{ id: "only", remainingQuantity: "1" }], "1.001"), null);
+  assert.equal(allocateStockBatches([{ id: "bad", remainingQuantity: "1.0001" }], "1"), null);
+});
+
+test("recipe demand uses exact milli-units and rounds fractional requirements up", () => {
+  assert.equal(calculateDemandQuantity("0.25", 3, 4), "0.334");
+  assert.equal(calculateDemandQuantity("2", 4, 10), "5");
+  assert.equal(calculateDemandQuantity("0", 3, 4), null);
+  assert.equal(calculateDemandQuantity("1", 0, 4), null);
 });
 
 test("campus-scoped memberships cannot select another campus", () => {

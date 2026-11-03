@@ -11,6 +11,8 @@ type DashboardData = {
     ingredients: number;
     stores: number;
     movements: number;
+    expiredBatches: number;
+    expiringBatches: number;
   };
   lowStock: {
     id: string;
@@ -28,6 +30,15 @@ type DashboardData = {
     createdAt: string;
     ingredient: { name: string; unit: string };
     store: { name: string; campus: { name: string } };
+  }[];
+  expiryAttention: {
+    id: string;
+    batchCode: string;
+    expiryDate: string;
+    remainingQuantity: string;
+    daysUntilExpiry: number;
+    store: { name: string; campus: { name: string } };
+    ingredient: { name: string; unit: string };
   }[];
 };
 
@@ -61,6 +72,7 @@ export default function DashboardPage() {
             <article className="metric-card"><span>Stores</span><strong>{data.metrics.stores}</strong><small>In your authorized scope</small><Link href="/inventory/stores">Manage stores →</Link></article>
             <article className="metric-card"><span>Stock positions</span><strong>{data.metrics.stockPositions}</strong><small>Across authorized stores</small><Link href="/inventory">View inventory →</Link></article>
             <article className={`metric-card${data.metrics.reorderAlerts ? " metric-warning" : ""}`}><span>Reorder alerts</span><strong>{data.metrics.reorderAlerts}</strong><small>At or below configured reorder level</small><Link href="/inventory">Review alerts →</Link></article>
+            <article className={`metric-card${data.metrics.expiredBatches + data.metrics.expiringBatches ? " metric-warning" : ""}`}><span>Expiry alerts</span><strong>{data.metrics.expiredBatches + data.metrics.expiringBatches}</strong><small>{data.metrics.expiredBatches} expired · {data.metrics.expiringBatches} within 30 days</small><Link href="/inventory/expiry">Review batches →</Link></article>
           </div>
           <div className="dashboard-columns">
             <Panel title="Stock needing attention" description="Real balances compared with each ingredient’s reorder level." action={<Link className="text-link" href="/inventory">All inventory →</Link>}>
@@ -74,13 +86,18 @@ export default function DashboardPage() {
               )}
             </Panel>
           </div>
+          <Panel title="Expiry attention" description="Expired and soon-to-expire batches with remaining stock." action={<Link className="text-link" href="/inventory/expiry">Expiry tracking →</Link>}>
+            {data.expiryAttention.length === 0 ? <EmptyState title="No expiry alerts">No on-hand batches are expired or expiring within 30 days.</EmptyState> : (
+              <div className="alert-list">{data.expiryAttention.map((batch) => <div className="alert-row" key={batch.id}><span className="alert-icon">!</span><span><strong>{batch.ingredient.name} · {batch.batchCode}</strong><small>{batch.store.campus.name} · {batch.store.name} · expires {batch.expiryDate.slice(0, 10)}</small></span><StatusBadge tone="warning">{batch.daysUntilExpiry < 0 ? `${Math.abs(batch.daysUntilExpiry)} days expired` : batch.daysUntilExpiry === 0 ? "Expires today" : `${batch.daysUntilExpiry} days left`}</StatusBadge></div>)}</div>
+            )}
+          </Panel>
           <Panel title="Available workflows" description="Only supported, connected operations are enabled in this release.">
             <div className="workflow-next">
-              <Link href="/inventory/movements"><span className="workflow-step">01</span><span><strong>Record a stock movement</strong><small>Receive stock, issue it to a kitchen, record waste, or adjust a balance.</small></span><span>→</span></Link>
-              <Link href="/inventory/ingredients"><span className="workflow-step">02</span><span><strong>Maintain the ingredient catalog</strong><small>Manage ingredient names, units, and reorder levels.</small></span><span>→</span></Link>
-              <Link href="/inventory/stores"><span className="workflow-step">03</span><span><strong>Review store locations</strong><small>See which authorized stores hold tracked stock.</small></span><span>→</span></Link>
+              <Link href="/inventory/ingredients"><span className="workflow-step">01</span><span><strong>Maintain the ingredient catalog</strong><small>Manage ingredient names, units, and reorder levels.</small></span><span>→</span></Link>
+              <Link href="/kitchen/recipes"><span className="workflow-step">02</span><span><strong>Define recipe versions</strong><small>Set ingredient quantities and serving yields.</small></span><span>→</span></Link>
+              <Link href="/kitchen/menus"><span className="workflow-step">03</span><span><strong>Plan a meal</strong><small>Schedule campus meals and calculate stock-backed requirements.</small></span><span>→</span></Link>
             </div>
-            <p className="dashboard-footnote"><StatusBadge tone="warning">Not available yet</StatusBadge> Menus, recipes, batches, expiry tracking, transfers, purchasing, production, and finance workflows are not implemented. No placeholder records or metrics are shown.</p>
+            <p className="dashboard-footnote"><StatusBadge tone="warning">Still in development</StatusBadge> Production recording, waste reporting, procurement, transfers, finance, and advanced reporting remain unavailable. No placeholder records or metrics are shown.</p>
           </Panel>
         </>
       )}
