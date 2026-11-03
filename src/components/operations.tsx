@@ -28,6 +28,15 @@ type Balance = {
   store: Store;
   ingredient: Ingredient;
 };
+type Movement = {
+  id: string;
+  kind: string;
+  quantity: string;
+  note: string | null;
+  createdAt: string;
+  store: { name: string; campus: { name: string } };
+  ingredient: { name: string; unit: string };
+};
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -73,7 +82,11 @@ export default function Operations({
   const [stores, setStores] = useState<Store[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
+  const [movementCursor, setMovementCursor] = useState<string | null>(null);
+  const [loadingMovements, setLoadingMovements] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [editingMembershipId, setEditingMembershipId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -83,22 +96,42 @@ export default function Operations({
         session.role === "INSTITUTION_ADMIN"
           ? api<{ memberships: Membership[] }>("/api/v1/memberships")
           : Promise.resolve({ memberships: [] as Membership[] });
-      const [campusResult, storeResult, ingredientResult, inventoryResult, membershipResult] = await Promise.all([
+      const [campusResult, storeResult, ingredientResult, inventoryResult, movementResult, membershipResult] = await Promise.all([
         api<{ campuses: Campus[] }>("/api/v1/campuses"),
         api<{ stores: Store[] }>("/api/v1/stores"),
         api<{ ingredients: Ingredient[] }>("/api/v1/ingredients"),
         api<{ balances: Balance[] }>("/api/v1/inventory"),
+        api<{ movements: Movement[]; nextCursor: string | null }>("/api/v1/inventory/movements"),
         membershipRequest,
       ]);
       setCampuses(campusResult.campuses);
       setStores(storeResult.stores);
       setIngredients(ingredientResult.ingredients);
       setBalances(inventoryResult.balances);
+      setMovements(movementResult.movements);
+      setMovementCursor(movementResult.nextCursor);
       setMemberships(membershipResult.memberships);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load operations.");
     }
   }, [session]);
+
+  async function loadOlderMovements() {
+    if (!movementCursor || loadingMovements) return;
+    setLoadingMovements(true);
+    setMessage("");
+    try {
+      const result = await api<{ movements: Movement[]; nextCursor: string | null }>(
+        `/api/v1/inventory/movements?cursor=${encodeURIComponent(movementCursor)}`,
+      );
+      setMovements((current) => [...current, ...result.movements]);
+      setMovementCursor(result.nextCursor);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load movement history.");
+    } finally {
+      setLoadingMovements(false);
+    }
+  }
 
   useEffect(() => {
     void refresh();
@@ -164,6 +197,24 @@ export default function Operations({
       setRefreshKey((key) => key + 1);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not revoke membership.");
+    }
+  }
+
+  async function updateMembership(event: FormEvent<HTMLFormElement>, membershipId: string) {
+    event.preventDefault();
+    setMessage("");
+    const form = event.currentTarget;
+    const body = Object.fromEntries(new FormData(form).entries());
+    try {
+      await api("/api/v1/memberships", {
+        method: "PATCH",
+        body: JSON.stringify({ ...body, membershipId }),
+      });
+      setEditingMembershipId(null);
+      setMessage("Membership access updated.");
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not update membership.");
     }
   }
 
@@ -362,7 +413,38 @@ export default function Operations({
                   <div className="member-row" key={membership.id}>
                     <span><strong>{membership.user.name}</strong><br />{membership.user.email}<br /><small>{membership.role.replaceAll("_", " ")} · {membership.campus?.name ?? "All campuses"}{membership.user.mustChangePassword ? " · password change required" : ""}</small></span>
                     {membership.user.email !== session.email && (
-                      <button className="secondary" onClick={() => void revokeMembership(membership.id)}>Revoke</button>
+                      <div className="member-actions">
+                        {editingMembershipId === membership.id ? (
+                          <form className="member-editor" onSubmit={(event) => void updateMembership(event, membership.id)}>
+                            <label>
+                              <span>Role</span>
+                              <select name="role" defaultValue={membership.role}>
+                                <option value="CAMPUS_MANAGER">Campus manager</option>
+                                <option value="KITCHEN_STAFF">Kitchen staff</option>
+                                <option value="STOREKEEPER">Storekeeper</option>
+                                <option value="INSTITUTION_ADMIN">Institution administrator</option>
+                              </select>
+                            </label>
+                            <label>
+                              <span>Campus</span>
+                              <select
+                                name="campusId"
+                                defaultValue={membership.campus?.id ?? campuses[0]?.id ?? ""}
+                                required
+                              >
+                                {campuses.map((campus) => <option key={campus.id} value={campus.id}>{campus.name}</option>)}
+                              </select>
+                            </label>
+                            <button className="primary" type="submit">Save access</button>
+                            <button className="secondary" type="button" onClick={() => setEditingMembershipId(null)}>Cancel</button>
+                          </form>
+                        ) : (
+                          <>
+                            <button className="secondary" onClick={() => setEditingMembershipId(membership.id)}>Edit access</button>
+                            <button className="secondary" onClick={() => void revokeMembership(membership.id)}>Revoke</button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -397,6 +479,43 @@ export default function Operations({
                 </tbody>
               </table>
             </div>
+          )}
+        </section>
+        <section className="card inventory">
+          <div className="section-heading">
+            <div>
+              <h3>Stock movement history</h3>
+              <p>Recent receipts, issues, waste, and adjustments from your authorized campuses.</p>
+            </div>
+            <button className="secondary" onClick={() => setRefreshKey((key) => key + 1)}>Refresh history</button>
+          </div>
+          {movements.length === 0 ? (
+            <p className="empty">No stock movements have been recorded yet.</p>
+          ) : (
+            <>
+              <div className="table-scroll">
+                <table>
+                  <thead><tr><th>Date</th><th>Movement</th><th>Ingredient</th><th>Store</th><th>Quantity</th><th>Note</th></tr></thead>
+                  <tbody>
+                    {movements.map((movement) => (
+                      <tr key={movement.id}>
+                        <td>{new Date(movement.createdAt).toLocaleString()}</td>
+                        <td><span className="tag">{movement.kind.replaceAll("_", " ")}</span></td>
+                        <td>{movement.ingredient.name}</td>
+                        <td>{movement.store.campus.name} · {movement.store.name}</td>
+                        <td>{movement.quantity} {movement.ingredient.unit}</td>
+                        <td>{movement.note || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {movementCursor && (
+                <button className="secondary" onClick={() => void loadOlderMovements()} disabled={loadingMovements}>
+                  {loadingMovements ? "Loading…" : "Load older movements"}
+                </button>
+              )}
+            </>
           )}
         </section>
       </div>

@@ -1,4 +1,9 @@
 export type StockKind = "RECEIPT" | "ISSUE" | "WASTE" | "ADJUSTMENT";
+export type MembershipRole =
+  | "INSTITUTION_ADMIN"
+  | "CAMPUS_MANAGER"
+  | "KITCHEN_STAFF"
+  | "STOREKEEPER";
 
 export function slugify(value: string): string {
   return value
@@ -42,4 +47,24 @@ export function campusScope(
     return { forbidden: true };
   }
   return { campusId: membership.campusId, forbidden: false };
+}
+
+export function membershipAccessChangeError(
+  actorUserId: string,
+  targetUserId: string,
+  currentRole: MembershipRole,
+  nextRole: MembershipRole,
+  institutionAdminCount: number,
+): string | null {
+  if (actorUserId === targetUserId) {
+    return "You cannot change your own membership.";
+  }
+  if (
+    currentRole === "INSTITUTION_ADMIN" &&
+    nextRole !== "INSTITUTION_ADMIN" &&
+    institutionAdminCount <= 1
+  ) {
+    return "The institution must retain an administrator.";
+  }
+  return null;
 }

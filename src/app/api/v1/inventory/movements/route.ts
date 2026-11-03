@@ -7,6 +7,43 @@ import { prisma } from "@/lib/db";
 
 const stockKinds: StockKind[] = ["RECEIPT", "ISSUE", "WASTE", "ADJUSTMENT"];
 
+export async function GET(request: Request) {
+  try {
+    const session = await requireMembership(request);
+    const url = new URL(request.url);
+    const campusId = scopedCampusId(session, url.searchParams.get("campusId"));
+    const cursor = url.searchParams.get("cursor") || undefined;
+    if (cursor && cursor.length > 191) {
+      throw new HttpError(400, "Invalid movement cursor.");
+    }
+
+    const movements = await prisma.stockMovement.findMany({
+      where: {
+        institutionId: session.membership.institutionId,
+        ...(campusId ? { store: { campusId } } : {}),
+      },
+      select: {
+        id: true,
+        kind: true,
+        quantity: true,
+        note: true,
+        createdAt: true,
+        store: { select: { name: true, campus: { select: { name: true } } } },
+        ingredient: { select: { name: true, unit: true } },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 50,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    return NextResponse.json({
+      movements,
+      nextCursor: movements.length === 50 ? movements.at(-1)?.id : null,
+    });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     assertSameOrigin(request);

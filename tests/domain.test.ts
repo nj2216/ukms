@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   campusScope,
+  membershipAccessChangeError,
   movementQuantity,
   normalizeEmail,
   slugify,
@@ -50,6 +51,25 @@ test("campus-scoped memberships cannot select another campus", () => {
     campusId: "c2",
     forbidden: false,
   });
+});
+
+test("membership changes cannot modify the actor or remove the last administrator", () => {
+  assert.equal(
+    membershipAccessChangeError("u1", "u1", "INSTITUTION_ADMIN", "CAMPUS_MANAGER", 2),
+    "You cannot change your own membership.",
+  );
+  assert.equal(
+    membershipAccessChangeError("u1", "u2", "INSTITUTION_ADMIN", "CAMPUS_MANAGER", 1),
+    "The institution must retain an administrator.",
+  );
+  assert.equal(
+    membershipAccessChangeError("u1", "u2", "INSTITUTION_ADMIN", "CAMPUS_MANAGER", 2),
+    null,
+  );
+  assert.equal(
+    membershipAccessChangeError("u1", "u2", "CAMPUS_MANAGER", "STOREKEEPER", 1),
+    null,
+  );
 });
 
 test("state-changing requests must have the same origin as the host", () => {

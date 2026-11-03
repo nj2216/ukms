@@ -92,7 +92,7 @@ Health endpoints are `/api/health/live` and `/api/health/ready`. Readiness check
 - State-changing API calls require same-origin requests. Login failures lock an account for 15 minutes after eight failed attempts.
 - The database should be reachable only from the application. Configure the reverse proxy to preserve the external `Host` and overwrite `X-Forwarded-Proto`; state-changing APIs compare both with the browser `Origin`. Use HTTPS at the reverse proxy and database TLS (`DATABASE_SSL=true`) for remote MySQL servers.
 
-Institution administrators can assign campus roles and revoke memberships in the team-access panel. Newly created accounts receive a random temporary password shown once; deliver it to the user through a separate secure channel. Users must change it before accessing institution data. Existing accounts can be assigned a second institution membership without changing their password. Email invitations, password recovery, role editing, and self-service institution onboarding are not implemented.
+Institution administrators can assign campus roles, edit a teammate's role or campus assignment, and revoke memberships in the team-access panel. Editing one's own membership is not allowed, and the institution must retain at least one administrator. Newly created accounts receive a random temporary password shown once; deliver it to the user through a separate secure channel. Users must change it before accessing institution data. Existing accounts can be assigned a second institution membership without changing their password. Email invitations, password recovery, and self-service institution onboarding are not implemented.
 
 ## Backups
 
@@ -117,9 +117,9 @@ The current versioned routes are:
 - `POST /api/v1/auth/bootstrap`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/session`, `GET /api/v1/auth/status`
 - `POST /api/v1/auth/change-password`
 - `GET|POST /api/v1/campuses`
-- `GET|POST|DELETE /api/v1/memberships` (institution administrators only)
+- `GET|POST|PATCH|DELETE /api/v1/memberships` (institution administrators only)
 - `GET|POST /api/v1/stores`
 - `GET|POST /api/v1/ingredients`
-- `GET /api/v1/inventory`, `POST /api/v1/inventory/movements`
+- `GET /api/v1/inventory`, `GET|POST /api/v1/inventory/movements`
 
 List endpoints have fixed result limits; ingredients and inventory also support cursor pagination. There is not yet a maintained OpenAPI specification or comprehensive automated integration/authorization test suite.
