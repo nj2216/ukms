@@ -4,6 +4,8 @@ Hostel Kitchen OS is a multi-tenant kitchen operations application. It provides 
 
 > **Implementation status:** this is a working but incomplete product, not the full platform described in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). The latest migration and primary production, procurement, finance, and analytics workflows were manually exercised against temporary MySQL. The application has not been deployed to production; external accounting/hostel connectors are not configured. See [`PROJECT_STATUS.md`](PROJECT_STATUS.md) for verified scope and remaining work.
 
+For a screenshot-led walkthrough of the application and its connected operational workflows, see [`documentation/WORKFLOWS.md`](documentation/WORKFLOWS.md). Its screenshots use synthetic data captured from an isolated local database and are illustrative, not live records.
+
 ## Requirements
 
 - Node.js 22.15 or later for local development.

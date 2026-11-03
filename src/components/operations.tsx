@@ -55,17 +55,19 @@ function FormField({
   type = "text",
   required = true,
   min,
+  autoComplete,
 }: {
   label: string;
   name: string;
   type?: string;
   required?: boolean;
   min?: string;
+  autoComplete?: string;
 }) {
   return (
     <label>
       <span>{label}</span>
-      <input name={name} type={type} required={required} min={min} />
+      <input name={name} type={type} required={required} min={min} autoComplete={autoComplete} />
     </label>
   );
 }
@@ -227,9 +229,9 @@ export default function Operations({
             ? "Use your institution slug and account details."
             : "Create the first institution administrator and main campus."}
         </p>
-        {message && <p className="notice error">{message}</p>}
+        {message && <p className="notice error" role="alert">{message}</p>}
         <form
-          className="form-grid"
+          className={`form-grid auth-form ${initialized ? "auth-login-form" : "auth-setup-form"}`}
           onSubmit={(event) =>
             void submit(
               event,
@@ -245,18 +247,24 @@ export default function Operations({
               <FormField label="First campus name" name="campusName" />
               <FormField label="Campus code" name="campusCode" />
               <FormField label="Your name" name="name" />
-              <FormField label="One-time setup token" name="bootstrapToken" type="password" />
+              <FormField label="One-time setup token" name="bootstrapToken" type="password" autoComplete="off" />
             </>
           ) : (
-            <FormField label="Institution slug" name="institutionSlug" />
+            <FormField label="Institution slug" name="institutionSlug" autoComplete="organization" />
           )}
-          <FormField label="Email" name="email" type="email" />
-          <FormField label="Password" name="password" type="password" min="12" />
+          <FormField label="Email address" name="email" type="email" autoComplete="email" />
+          <FormField
+            label="Password"
+            name="password"
+            type="password"
+            min="12"
+            autoComplete={initialized ? "current-password" : "new-password"}
+          />
           <button className="primary" type="submit">
             {initialized ? "Sign in" : "Create institution"}
           </button>
         </form>
-        {!initialized && <small>Use a unique password with at least 12 characters.</small>}
+        {!initialized && <small className="auth-form-hint">Use a unique password with at least 12 characters.</small>}
       </section>
     );
   }
@@ -266,10 +274,10 @@ export default function Operations({
       <section className="card auth-card">
         <h2>Change your temporary password</h2>
         <p>You must choose a new password before accessing institution data.</p>
-        {message && <p className="notice error">{message}</p>}
-        <form className="form-grid" onSubmit={(event) => void submit(event, "/api/v1/auth/change-password", "Password changed.", false)}>
-          <FormField label="Temporary password" name="currentPassword" type="password" />
-          <FormField label="New password" name="newPassword" type="password" min="12" />
+        {message && <p className="notice error" role="alert">{message}</p>}
+        <form className="form-grid auth-form auth-password-form" onSubmit={(event) => void submit(event, "/api/v1/auth/change-password", "Password changed.", false)}>
+          <FormField label="Temporary password" name="currentPassword" type="password" autoComplete="current-password" />
+          <FormField label="New password" name="newPassword" type="password" min="12" autoComplete="new-password" />
           <button className="primary" type="submit">Update password</button>
         </form>
       </section>
